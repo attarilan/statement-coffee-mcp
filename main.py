@@ -1,11 +1,8 @@
 import os
+import json
 import requests
 import uvicorn
 from mcp.server.fastmcp import FastMCP
-from starlette.requests import Request
-from starlette.responses import JSONResponse, Response
-from starlette.routing import Route, Mount
-from starlette.applications import Starlette
 
 mcp = FastMCP("Statement Coffee ESB Core")
 
@@ -62,26 +59,42 @@ def check_item_stock(branch_id: str, search_query: str = "") -> str:
     except Exception as e:
         return f"Network error tracking stock: {str(e)}"
 
-# Tell Claude: no sign-in required
-async def oauth_resource_handler(request: Request):
-    return JSONResponse({
-        "resource": "https://statement-coffee-mcp.onrender.com",
-        "authorization_servers": []
-    })
 
-async def not_found_handler(request: Request):
-    return Response(status_code=404)
+# Build the MCP streamable HTTP app
+mcp_asgi = mcp.streamable_http_app()
 
-# Use the newer Streamable HTTP transport (replaces SSE)
-mcp_app = mcp.streamable_http_app()
+# Lightweight wrapper: intercepts OAuth discovery, passes everything else
+# (including lifespan startup) directly to the MCP engine
+class MCPWrapper:
+    def __init__(self, app):
+        self.app = app
 
-app = Starlette(routes=[
-    Route("/.well-known/oauth-protected-resource", oauth_resource_handler),
-    Route("/.well-known/oauth-protected-resource/{path:path}", oauth_resource_handler),
-    Route("/.well-known/oauth-authorization-server", not_found_handler),
-    Route("/register", not_found_handler, methods=["POST"]),
-    Mount("/", app=mcp_app),
-])
+    async def __call__(self, scope, receive, send):
+        # Always pass lifespan events through so MCP initializes properly
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        path = scope.get("path", "")
+
+        # OAuth discovery: tell Claude no sign-in is required
+        if path == "/.well-known/oauth-protected-resource" or \
+           path.startswith("/.well-known/oauth-protected-resource/"):
+            body = json.dumps({
+                "resource": "https://statement-coffee-mcp.onrender.com",
+                "authorization_servers": []
+            }).encode()
+            await send({"type": "http.response.start", "status": 200,
+                        "headers": [(b"content-type", b"application/json"),
+                                    (b"content-length", str(len(body)).encode())]})
+            await send({"type": "http.response.body", "body": body})
+            return
+
+        # Everything else (including /mcp) goes to the MCP engine
+        await self.app(scope, receive, send)
+
+
+app = MCPWrapper(mcp_asgi)
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 8000))
