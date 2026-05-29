@@ -166,6 +166,71 @@ def create_bill_of_material(
         return f"Network error: {str(e)}"
 
 @mcp.tool()
+def update_bill_of_material(
+    bom_id: str,
+    bom_type: str,
+    bom_name: str,
+    bom_cost_total: float,
+    access_type: int,
+    bom_details: str,
+    bom_code: str = "",
+    product_detail_id: int = 0,
+    notes: str = "",
+    bom_costs: str = ""
+) -> str:
+    """
+    Update an existing Bill of Material in ESB Core by its ID.
+    bom_type: 'menu' (3), 'assembly' (1), or 'disassembly' (2).
+    bom_details: JSON array of objects with keys: ID, productDetailID, lastHPP, qty, yieldPercent, tolerancePercent, printGroup (opt), weightFactor (opt, required for disassembly).
+    bom_costs: optional JSON array with keys: ID, costDescription, coaNo, costTotal.
+    product_detail_id: required for assembly/disassembly, optional for menu.
+    access_type: 0=all users, 1=specific users only.
+    """
+    token = get_esb_token()
+    if not token:
+        return "Authentication Failure: Could not get login token from ESB Core."
+
+    bom_type_map = {"menu": 3, "assembly": 1, "disassembly": 2}
+    bom_type_id = bom_type_map.get(bom_type.lower())
+    if bom_type_id is None:
+        return "Error: bom_type must be 'menu', 'assembly', or 'disassembly'."
+
+    try:
+        details = json.loads(bom_details)
+    except Exception:
+        return "Error: bom_details must be a valid JSON array."
+
+    payload = {
+        "bomTypeID": bom_type_id,
+        "bomName": bom_name,
+        "bomCostTotal": bom_cost_total,
+        "accessType": access_type,
+        "selectedUserAccess": [],
+        "bomDetails": details,
+    }
+    if bom_code:
+        payload["bomCode"] = bom_code
+    if notes:
+        payload["notes"] = notes
+    if product_detail_id:
+        payload["productDetailID"] = product_detail_id
+    if bom_costs:
+        try:
+            payload["bomCosts"] = json.loads(bom_costs)
+        except Exception:
+            return "Error: bom_costs must be a valid JSON array."
+
+    url = f"{ESB_BASE_URL}/product/bom/{bom_id}"
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+    try:
+        response = requests.put(url, headers=headers, json=payload, timeout=15)
+        if response.status_code == 200:
+            return f"BOM updated: {response.json().get('result', response.json())}"
+        return f"ESB Error {response.status_code}: {response.text}"
+    except Exception as e:
+        return f"Network error: {str(e)}"
+
+@mcp.tool()
 def create_assembly_actual(
     simple_manufacturing_date: str,
     branch_id: int,
