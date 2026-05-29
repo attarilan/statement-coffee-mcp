@@ -62,7 +62,7 @@ def check_item_stock(branch_id: str, search_query: str = "") -> str:
     except Exception as e:
         return f"Network error tracking stock: {str(e)}"
 
-# Tell Claude: this server exists, no sign-in required
+# Tell Claude: no sign-in required
 async def oauth_resource_handler(request: Request):
     return JSONResponse({
         "resource": "https://statement-coffee-mcp.onrender.com",
@@ -72,33 +72,15 @@ async def oauth_resource_handler(request: Request):
 async def not_found_handler(request: Request):
     return Response(status_code=404)
 
-# The MCP SSE engine
-sse_subapp = mcp.sse_app()
-
-# Fix: swap the Render domain in the Host header for "localhost"
-# so the MCP library's security check passes
-async def patched_mcp_app(scope, receive, send):
-    if scope.get("type") == "http":
-        port = int(os.getenv("PORT", 8000))
-        patched_headers = []
-        for key, value in scope.get("headers", []):
-            if key.lower() == b"host":
-                patched_headers.append((b"host", f"localhost:{port}".encode()))
-            else:
-                patched_headers.append((key, value))
-        scope = dict(scope)
-        scope["headers"] = patched_headers
-        if scope["path"] == "/":
-            scope["path"] = "/sse"
-            scope["raw_path"] = b"/sse"
-    await sse_subapp(scope, receive, send)
+# Use the newer Streamable HTTP transport (replaces SSE)
+mcp_app = mcp.streamable_http_app()
 
 app = Starlette(routes=[
     Route("/.well-known/oauth-protected-resource", oauth_resource_handler),
     Route("/.well-known/oauth-protected-resource/{path:path}", oauth_resource_handler),
     Route("/.well-known/oauth-authorization-server", not_found_handler),
     Route("/register", not_found_handler, methods=["POST"]),
-    Mount("/", app=patched_mcp_app),
+    Mount("/", app=mcp_app),
 ])
 
 if __name__ == "__main__":
