@@ -26,51 +26,58 @@ def get_esb_token():
         return None
 
 @mcp.tool()
-def get_daily_sales(branch_id: str, report_date: str) -> str:
-    """Fetches daily sales summary for a specific Statement Coffee branch from ESB Core (YYYY-MM-DD)."""
+def get_daily_sales(branch_id: str, date_from: str, date_to: str = "") -> str:
+    """Get Simple Sales transactions for a Statement Coffee branch. Use dateFrom and dateTo in YYYY-MM-DD format. date_to defaults to same as date_from if not provided."""
     token = get_esb_token()
     if not token:
-        return "Authentication Failure: Could not generate a login token via ESB Core."
-    url = f"{ESB_BASE_URL}/reports/sales"
-    params = {"branchID": branch_id, "date": report_date}
+        return "Authentication Failure: Could not get login token from ESB Core."
+    if not date_to:
+        date_to = date_from
+    url = f"{ESB_BASE_URL}/sales/simple-product-sales"
+    params = {"branchID": branch_id, "dateFrom": date_from, "dateTo": date_to, "limit": 100}
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
     try:
         response = requests.get(url, headers=headers, params=params, timeout=15)
         if response.status_code == 200:
-            return f"Data payload: {response.json().get('result', 'No result data found')}"
-        return f"ESB Error: {response.status_code} - {response.text}"
+            return f"Sales data: {response.json().get('result', 'No result found')}"
+        return f"ESB Error {response.status_code}: {response.text}"
     except Exception as e:
-        return f"Network error linking to ESB: {str(e)}"
+        return f"Network error: {str(e)}"
 
 @mcp.tool()
-def check_item_stock(branch_id: str, search_query: str = "") -> str:
-    """Queries ESB Core Inventory to get real-time stock counts for cafe items."""
+def check_stock_movement(start_period: str, end_period: str = "", branch_code: str = "", product_name: str = "") -> str:
+    """Get stock movement report from ESB Core. Use start_period and end_period in YYYY-MM-DD format. branch_code and product_name are optional filters."""
     token = get_esb_token()
     if not token:
-        return "Authentication Failure: Could not generate a login token via ESB Core."
-    url = f"{ESB_BASE_URL}/inventory/stock-status"
-    params = {"branchID": branch_id, "search": search_query}
+        return "Authentication Failure: Could not get login token from ESB Core."
+    if not end_period:
+        end_period = start_period
+    url = f"{ESB_BASE_URL}/report/stock-movement"
+    params = {"startPeriod": start_period, "endPeriod": end_period, "limit": 100}
+    if branch_code:
+        params["branchCode"] = branch_code
+    if product_name:
+        params["productName"] = product_name
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
     try:
         response = requests.get(url, headers=headers, params=params, timeout=15)
         if response.status_code == 200:
-            return f"Data payload: {response.json().get('result', 'No result data found')}"
-        return f"ESB Error: {response.status_code}"
+            return f"Stock movement data: {response.json().get('result', 'No result found')}"
+        return f"ESB Error {response.status_code}: {response.text}"
     except Exception as e:
-        return f"Network error tracking stock: {str(e)}"
+        return f"Network error: {str(e)}"
 
 
-# Build the MCP streamable HTTP app
+# Build the MCP app
 mcp_asgi = mcp.streamable_http_app()
 
-# Lightweight wrapper: intercepts OAuth discovery, passes everything else
-# (including lifespan startup) directly to the MCP engine
+# Wrapper: fixes host header + handles OAuth discovery + passes lifespan through
 class MCPWrapper:
     def __init__(self, app):
         self.app = app
 
     async def __call__(self, scope, receive, send):
-        # Always pass lifespan events through so MCP initializes properly
+        # Pass lifespan through directly so MCP initializes its task group
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
@@ -90,7 +97,18 @@ class MCPWrapper:
             await send({"type": "http.response.body", "body": body})
             return
 
-        # Everything else (including /mcp) goes to the MCP engine
+        # Fix host header: rewrite Render's public domain to localhost
+        # so the MCP library's security check passes
+        port = int(os.getenv("PORT", 8000))
+        patched_headers = []
+        for key, value in scope.get("headers", []):
+            if key.lower() == b"host":
+                patched_headers.append((b"host", f"localhost:{port}".encode()))
+            else:
+                patched_headers.append((key, value))
+        scope = dict(scope)
+        scope["headers"] = patched_headers
+
         await self.app(scope, receive, send)
 
 
