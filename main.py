@@ -66,7 +66,42 @@ def check_stock_movement(start_period: str, end_period: str = "", branch_code: s
         return f"ESB Error {response.status_code}: {response.text}"
     except Exception as e:
         return f"Network error: {str(e)}"
+@mcp.tool()
+def list_bill_of_materials(product_name: str = "", bom_id: str = "", flag_active: str = "1") -> str:
+    """List Bill of Materials from ESB Core. Optionally filter by product_name, bom_id, or flag_active (1=Active, 2=Not Active)."""
+    token = get_esb_token()
+    if not token:
+        return "Authentication Failure: Could not get login token from ESB Core."
+    url = f"{ESB_BASE_URL}/product/bom"
+    params = {"limit": 100, "flagActive": flag_active}
+    if product_name:
+        params["productName"] = product_name
+    if bom_id:
+        params["bomID"] = bom_id
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+    try:
+        response = requests.get(url, headers=headers, params=params, timeout=15)
+        if response.status_code == 200:
+            return f"Bill of Materials list: {response.json().get('result', 'No data found')}"
+        return f"ESB Error {response.status_code}: {response.text}"
+    except Exception as e:
+        return f"Network error: {str(e)}"
 
+@mcp.tool()
+def get_bill_of_material_detail(bom_id: str) -> str:
+    """Get full detail of a specific Bill of Material by its ID from ESB Core."""
+    token = get_esb_token()
+    if not token:
+        return "Authentication Failure: Could not get login token from ESB Core."
+    url = f"{ESB_BASE_URL}/product/bom/{bom_id}"
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+    try:
+        response = requests.get(url, headers=headers, timeout=15)
+        if response.status_code == 200:
+            return f"BOM detail: {response.json().get('result', 'No data found')}"
+        return f"ESB Error {response.status_code}: {response.text}"
+    except Exception as e:
+        return f"Network error: {str(e)}"
 
 # Build the MCP app
 mcp_asgi = mcp.streamable_http_app()
