@@ -396,17 +396,42 @@ def update_bom_name(bom_id: str, new_bom_name: str) -> str:
     token = get_esb_token()
     if not token:
         return "Authentication Failure: Could not get login token from ESB Core."
-    url = f"{ESB_BASE_URL}/product/bom/{bom_id}"
-    payload = {"bomName": new_bom_name}
+ 
+    # First, fetch the current BOM to get all required fields
+    get_url = f"{ESB_BASE_URL}/product/bom/{bom_id}"
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+ 
     try:
-        response = requests.put(url, json=payload, headers=headers, timeout=15)
-        if response.status_code == 200:
+        # Get current BOM data
+        get_response = requests.get(get_url, headers=headers, timeout=15)
+        if get_response.status_code != 200:
+            return f"ESB Error {get_response.status_code}: Could not fetch BOM {bom_id}"
+ 
+        bom_data = get_response.json().get('result', {})
+        if not bom_data:
+            return f"ERROR: BOM {bom_id} not found"
+ 
+        # Prepare update payload with all required fields
+        update_payload = {
+            "bomName": new_bom_name,
+            "bomCode": bom_data.get('bomCode', ''),
+            "bomTypeID": bom_data.get('bomTypeID'),
+            "productDetailID": bom_data.get('productDetailID'),
+            "notes": bom_data.get('notes', ''),
+            "bomCostTotal": bom_data.get('bomCostTotal', 0),
+            "accessType": bom_data.get('accessType', 0),
+            "bomDetails": bom_data.get('bomDetails', []),
+            "bomCosts": bom_data.get('bomCosts', []),
+            "selectedUserAccess": bom_data.get('selectedUserAccess', [])
+        }
+ 
+        # Update the BOM with new name
+        put_response = requests.put(get_url, json=update_payload, headers=headers, timeout=15)
+        if put_response.status_code == 200:
             return f"SUCCESS: BOM {bom_id} renamed to '{new_bom_name}'"
-        return f"ESB Error {response.status_code}: {response.text}"
+        return f"ESB Error {put_response.status_code}: {put_response.text}"
     except Exception as e:
         return f"Network error: {str(e)}"
-
 # Build the MCP app
 mcp_asgi = mcp.streamable_http_app()
 
