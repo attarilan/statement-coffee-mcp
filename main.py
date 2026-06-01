@@ -363,29 +363,6 @@ def create_memorial_journal(
         return f"Network error: {str(e)}"
 
 @mcp.tool()
-def list_all_boms(limit: int = 100, page: int = 1) -> str:
-    """
-    List all Bill of Materials from ESB Core with pagination support.
-    Returns bomID, bomName, bomTypeID, bomCode, and other details.
-    Use limit=200+ and page parameter to fetch all 192+ BOMs across pages.
-    """
-    token = get_esb_token()
-    if not token:
-        return "Authentication Failure: Could not get login token from ESB Core."
-    url = f"{ESB_BASE_URL}/product/bom"
-    params = {"limit": limit, "page": page}
-    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
-    try:
-        response = requests.get(url, headers=headers, params=params, timeout=15)
-        if response.status_code == 200:
-            data = response.json().get('result', [])
-            return f"BOMs (page {page}): {json.dumps(data, indent=2)}"
-        return f"ESB Error {response.status_code}: {response.text}"
-    except Exception as e:
-        return f"Network error: {str(e)}"
- 
- 
-@mcp.tool()
 def update_bom_name(bom_id: str, new_bom_name: str) -> str:
     """
     Update a Bill of Material's name by bomID.
@@ -412,14 +389,15 @@ def update_bom_name(bom_id: str, new_bom_name: str) -> str:
             return f"ERROR: BOM {bom_id} not found"
  
         # Prepare update payload with all required fields
+        # Ensure numeric fields are integers, not strings
         update_payload = {
             "bomName": new_bom_name,
             "bomCode": bom_data.get('bomCode', ''),
-            "bomTypeID": bom_data.get('bomTypeID'),
-            "productDetailID": bom_data.get('productDetailID'),
+            "bomTypeID": int(bom_data.get('bomTypeID', 0)),
+            "productDetailID": bom_data.get('productDetailID'),  # Can be null for type 3
             "notes": bom_data.get('notes', ''),
-            "bomCostTotal": bom_data.get('bomCostTotal', 0),
-            "accessType": bom_data.get('accessType', 0),
+            "bomCostTotal": float(bom_data.get('bomCostTotal', 0)),
+            "accessType": int(bom_data.get('accessType', 0)),
             "bomDetails": bom_data.get('bomDetails', []),
             "bomCosts": bom_data.get('bomCosts', []),
             "selectedUserAccess": bom_data.get('selectedUserAccess', [])
@@ -432,6 +410,7 @@ def update_bom_name(bom_id: str, new_bom_name: str) -> str:
         return f"ESB Error {put_response.status_code}: {put_response.text}"
     except Exception as e:
         return f"Network error: {str(e)}"
+ 
 # Build the MCP app
 mcp_asgi = mcp.streamable_http_app()
 
