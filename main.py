@@ -388,19 +388,36 @@ def update_bom_name(bom_id: str, new_bom_name: str) -> str:
         if not bom_data:
             return f"ERROR: BOM {bom_id} not found"
  
+        # Helper function to safely convert to int
+        def safe_int(val, default=0):
+            if val is None or val == '':
+                return default
+            try:
+                return int(val)
+            except (ValueError, TypeError):
+                return default
+ 
+        # Helper function to safely convert to float
+        def safe_float(val, default=0.0):
+            if val is None or val == '':
+                return default
+            try:
+                return float(val)
+            except (ValueError, TypeError):
+                return default
+ 
         # Prepare update payload with all required fields
-        # Ensure numeric fields are integers, not strings
         update_payload = {
             "bomName": new_bom_name,
-            "bomCode": bom_data.get('bomCode', ''),
-            "bomTypeID": int(bom_data.get('bomTypeID', 0)),
-            "productDetailID": bom_data.get('productDetailID'),  # Can be null for type 3
-            "notes": bom_data.get('notes', ''),
-            "bomCostTotal": float(bom_data.get('bomCostTotal', 0)),
-            "accessType": int(bom_data.get('accessType', 0)),
-            "bomDetails": bom_data.get('bomDetails', []),
-            "bomCosts": bom_data.get('bomCosts', []),
-            "selectedUserAccess": bom_data.get('selectedUserAccess', [])
+            "bomCode": bom_data.get('bomCode') or '',
+            "bomTypeID": safe_int(bom_data.get('bomTypeID'), 3),
+            "productDetailID": bom_data.get('productDetailID') or None,
+            "notes": bom_data.get('notes') or '',
+            "bomCostTotal": safe_float(bom_data.get('bomCostTotal'), 0),
+            "accessType": safe_int(bom_data.get('accessType'), 0),
+            "bomDetails": bom_data.get('bomDetails') or [],
+            "bomCosts": bom_data.get('bomCosts') or [],
+            "selectedUserAccess": bom_data.get('selectedUserAccess') or []
         }
  
         # Update the BOM with new name
@@ -410,7 +427,6 @@ def update_bom_name(bom_id: str, new_bom_name: str) -> str:
         return f"ESB Error {put_response.status_code}: {put_response.text}"
     except Exception as e:
         return f"Network error: {str(e)}"
- 
 # Build the MCP app
 mcp_asgi = mcp.streamable_http_app()
 
