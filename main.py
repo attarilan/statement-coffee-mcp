@@ -424,64 +424,52 @@ def update_bom_name(bom_id: str, new_bom_name: str) -> str:
     except Exception as e:
         return f"Network error: {str(e)}"
  
-# ── ESB OMS — POS Sales ─────────────────────────────────────────────────────
+# ââ ESB OMS â POS Sales âââââââââââââââââââââââââââââââââââââââââââââââââââââ
 @mcp.tool()
 def get_pos_sales_information(
     sales_date_from: str,
     sales_date_to: str,
     branch_code: str = "",
-    status_name: str = "",
-    page: int = 1,
-    sort_by: str = "",
-    sort_order: str = "",
-    sales_num: str = "",
-    bill_num: str = "",
     self_order_id: str = "",
-    ext_branch_code: str = ""
+    page: int = 1
 ) -> str:
     """
-    Get per-item POS sales information synced from ESB local POS systems (ESB OMS).
-    Returns transaction-level sales breakdown including items sold, quantities,
-    revenue, and bill details per branch.
+    Get POS sales transactions from ESB OMS (int-erp.esb.co.id).
+    Uses HTTP Basic Auth with ESB_USERNAME and ESB_PASSWORD.
     sales_date_from and sales_date_to are required, format YYYY-MM-DD.
-    branch_code filters by branch (if empty, all branches returned).
-    status_name can be: New, Finished, Cancelled, or Void.
-    sort_by can be: salesDateIn, salesDateOut, memberCode.
-    sort_order can be: asc or desc.
-    sales_num and bill_num must be exact matches if provided.
+    branch_code and self_order_id are optional filters.
+    Returns paginated results; use page to get subsequent pages.
     """
-    url = f"{ESB_BASE_URL_EXT}/corev1/sales/sales-information"
-    params = {
-        "salesDateFrom": sales_date_from,
-        "salesDateTo": sales_date_to,
-        "page": page,
+    import base64
+    credentials = base64.b64encode(f"{ESB_USERNAME}:{ESB_PASSWORD}".encode()).decode()
+    headers = {
+        "Authorization": f"Basic {credentials}",
+        "Content-Type": "application/json"
     }
-    if branch_code:
-        params["branchCode"] = branch_code
-    if status_name:
-        params["statusName"] = status_name
-    if sort_by:
-        params["sortBy"] = sort_by
-    if sort_order:
-        params["sortOrder"] = sort_order
-    if sales_num:
-        params["salesNum"] = sales_num
-    if bill_num:
-        params["billNum"] = bill_num
-    if self_order_id:
-        params["selfOrderID"] = self_order_id
-    if ext_branch_code:
-        params["extBranchCode"] = ext_branch_code
- 
-    headers = {"Content-Type": "application/json"}
+    body = {
+        "filterSalesDateFrom": sales_date_from,
+        "filterSalesDateTo": sales_date_to,
+        "filterBranchCode": branch_code,
+        "filterSelfOrderID": self_order_id
+    }
+    url = f"https://int-erp.esb.co.id/external/sales/get-sales-information?page={page}"
     try:
-        response = requests.get(url, headers=headers, params=params, auth=(ESB_USERNAME, ESB_PASSWORD), timeout=15)
+        response = requests.post(url, headers=headers, json=body, timeout=30)
         if response.status_code == 200:
-            return f"POS sales information: {response.json().get('result', response.json())}"
+            total_pages = response.headers.get("X-Pagination-Page-Count", "?")
+            current_page = response.headers.get("X-Pagination-Current-Page", page)
+            total_count = response.headers.get("X-Pagination-Total-Count", "?")
+            data = response.json()
+            return json.dumps({
+                "page": current_page,
+                "totalPages": total_pages,
+                "totalCount": total_count,
+                "sales": data
+            })
         return f"OMS Error {response.status_code}: {response.text}"
     except Exception as e:
         return f"Network error: {str(e)}"
- 
+
 # Build the MCP app
 mcp_asgi = mcp.streamable_http_app()
  
