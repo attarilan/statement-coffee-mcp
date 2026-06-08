@@ -26,21 +26,7 @@ def get_esb_token():
     except Exception:
         return None
  
-def get_oms_token():
-    """Separate login call for ESB OMS (core-api.esb.co.id). Same credentials, separate session."""
-    login_url = f"{ESB_BASE_URL}/auth/login"
-    payload = {"username": ESB_USERNAME, "password": ESB_PASSWORD}
-    try:
-        response = requests.post(login_url, json=payload, timeout=10)
-        if response.status_code == 200:
-            result_data = response.json().get("result", {})
-            if isinstance(result_data, dict):
-                token = result_data.get("accessToken")
-                if token:
-                    return token
-        return None
-    except Exception:
-        return None
+ 
  
 @mcp.tool()
 def get_daily_sales(branch_id: str, date_from: str, date_to: str = "") -> str:
@@ -464,9 +450,9 @@ def get_pos_sales_information(
     sort_order can be: asc or desc.
     sales_num and bill_num must be exact matches if provided.
     """
-    token = get_oms_token()
+    token = get_esb_token()
     if not token:
-        return "Authentication Failure: Could not get OMS login token."
+        return "Authentication Failure: Could not get login token from ESB Core."
  
     url = f"{ESB_BASE_URL_EXT}/corev1/sales/sales-information"
     params = {
