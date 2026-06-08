@@ -450,10 +450,6 @@ def get_pos_sales_information(
     sort_order can be: asc or desc.
     sales_num and bill_num must be exact matches if provided.
     """
-    token = get_esb_token()
-    if not token:
-        return "Authentication Failure: Could not get login token from ESB Core."
- 
     url = f"{ESB_BASE_URL_EXT}/corev1/sales/sales-information"
     params = {
         "salesDateFrom": sales_date_from,
@@ -477,12 +473,9 @@ def get_pos_sales_information(
     if ext_branch_code:
         params["extBranchCode"] = ext_branch_code
  
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "Content-Type": "application/json"
-    }
+    headers = {"Content-Type": "application/json"}
     try:
-        response = requests.get(url, headers=headers, params=params, timeout=15)
+        response = requests.get(url, headers=headers, params=params, auth=(ESB_USERNAME, ESB_PASSWORD), timeout=15)
         if response.status_code == 200:
             return f"POS sales information: {response.json().get('result', response.json())}"
         return f"OMS Error {response.status_code}: {response.text}"
