@@ -373,22 +373,19 @@ def update_bom_name(bom_id: str, new_bom_name: str) -> str:
     token = get_esb_token()
     if not token:
         return "Authentication Failure: Could not get login token from ESB Core."
- 
-    # First, fetch the current BOM to get all required fields
+
     get_url = f"{ESB_BASE_URL}/product/bom/{bom_id}"
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
- 
+
     try:
-        # Get current BOM data
         get_response = requests.get(get_url, headers=headers, timeout=15)
         if get_response.status_code != 200:
             return f"ESB Error {get_response.status_code}: Could not fetch BOM {bom_id}"
- 
+
         bom_data = get_response.json().get('result', {})
         if not bom_data:
             return f"ERROR: BOM {bom_id} not found"
- 
-        # Helper function to safely convert to int
+
         def safe_int(val, default=0):
             if val is None or val == '':
                 return default
@@ -396,8 +393,7 @@ def update_bom_name(bom_id: str, new_bom_name: str) -> str:
                 return int(val)
             except (ValueError, TypeError):
                 return default
- 
-        # Helper function to safely convert to float
+
         def safe_float(val, default=0.0):
             if val is None or val == '':
                 return default
@@ -405,8 +401,7 @@ def update_bom_name(bom_id: str, new_bom_name: str) -> str:
                 return float(val)
             except (ValueError, TypeError):
                 return default
- 
-        # Prepare update payload with all required fields
+
         update_payload = {
             "bomName": new_bom_name,
             "bomCode": bom_data.get('bomCode') or '',
@@ -419,14 +414,79 @@ def update_bom_name(bom_id: str, new_bom_name: str) -> str:
             "bomCosts": bom_data.get('bomCosts') or [],
             "selectedUserAccess": bom_data.get('selectedUserAccess') or []
         }
- 
-        # Update the BOM with new name
+
         put_response = requests.put(get_url, json=update_payload, headers=headers, timeout=15)
         if put_response.status_code == 200:
             return f"SUCCESS: BOM {bom_id} renamed to '{new_bom_name}'"
         return f"ESB Error {put_response.status_code}: {put_response.text}"
     except Exception as e:
         return f"Network error: {str(e)}"
+
+# ── ESB OMS — POS Sales ─────────────────────────────────────────────────────
+@mcp.tool()
+def get_pos_sales_information(
+    sales_date_from: str,
+    sales_date_to: str,
+    branch_code: str = "",
+    status_name: str = "",
+    page: int = 1,
+    sort_by: str = "",
+    sort_order: str = "",
+    sales_num: str = "",
+    bill_num: str = "",
+    self_order_id: str = "",
+    ext_branch_code: str = ""
+) -> str:
+    """
+    Get per-item POS sales information synced from ESB local POS systems (ESB OMS).
+    Returns transaction-level sales breakdown including items sold, quantities,
+    revenue, and bill details per branch.
+    sales_date_from and sales_date_to are required, format YYYY-MM-DD.
+    branch_code filters by branch (if empty, all branches returned).
+    status_name can be: New, Finished, Cancelled, or Void.
+    sort_by can be: salesDateIn, salesDateOut, memberCode.
+    sort_order can be: asc or desc.
+    sales_num and bill_num must be exact matches if provided.
+    """
+    token = get_esb_token()
+    if not token:
+        return "Authentication Failure: Could not get login token from ESB Core."
+
+    url = f"{ESB_BASE_URL_EXT}/corev1/sales/sales-information"
+    params = {
+        "salesDateFrom": sales_date_from,
+        "salesDateTo": sales_date_to,
+        "page": page,
+    }
+    if branch_code:
+        params["branchCode"] = branch_code
+    if status_name:
+        params["statusName"] = status_name
+    if sort_by:
+        params["sortBy"] = sort_by
+    if sort_order:
+        params["sortOrder"] = sort_order
+    if sales_num:
+        params["salesNum"] = sales_num
+    if bill_num:
+        params["billNum"] = bill_num
+    if self_order_id:
+        params["selfOrderID"] = self_order_id
+    if ext_branch_code:
+        params["extBranchCode"] = ext_branch_code
+
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json"
+    }
+    try:
+        response = requests.get(url, headers=headers, params=params, timeout=15)
+        if response.status_code == 200:
+            return f"POS sales information: {response.json().get('result', response.json())}"
+        return f"OMS Error {response.status_code}: {response.text}"
+    except Exception as e:
+        return f"Network error: {str(e)}"
+
 # Build the MCP app
 mcp_asgi = mcp.streamable_http_app()
 
