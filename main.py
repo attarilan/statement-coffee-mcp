@@ -423,6 +423,35 @@ def update_bom_name(bom_id: str, new_bom_name: str) -> str:
         return f"ESB Error {put_response.status_code}: {put_response.text}"
     except Exception as e:
         return f"Network error: {str(e)}"
+
+@mcp.tool()
+def list_products(product_name: str = "", category_id: str = "", flag_active: str = "1", limit: str = "100") -> str:
+    """
+    List Products from ESB Core Master Product catalogue. Optionally filter by product_name 
+    (partial match), category_id (integer), and flag_active (1=Active, 0=Not Active). 
+    Returns productID, productName, productCode, categoryName, subCategoryName, bomID, 
+    bomName, and flagActive for each product. Use this to search and browse ESB products 
+    for use in item lists, BOM ingredients, or stock tracking.
+    """
+    token = get_esb_token()
+    if not token:
+        return "Authentication Failure: Could not get login token from ESB Core."
+    url = f"{ESB_BASE_URL}/product/list"
+    params = {"limit": int(limit) if limit else 100}
+    if product_name:
+        params["productName"] = product_name
+    if category_id:
+        params["categoryID"] = int(category_id)
+    if flag_active != "":
+        params["flagActive"] = int(flag_active)
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+    try:
+        response = requests.get(url, headers=headers, params=params, timeout=15)
+        if response.status_code == 200:
+            return f"Products: {response.json().get('result', 'No data found')}"
+        return f"ESB Error {response.status_code}: {response.text}"
+    except Exception as e:
+        return f"Network error: {str(e)}"
  
 
  # ── ESB OMS — POS Sales ─────────────────────────────────────────────────────
