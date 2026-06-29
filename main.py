@@ -100,6 +100,43 @@ def get_daily_sales(branch_id: str, date_from: str, date_to: str = "") -> str:
         return f"ESB Error {response.status_code}: {response.text}"
     except Exception as e:
         return f"Network error: {str(e)}"
+
+@mcp.tool()
+def list_purchase_requests(
+    purchase_request_num: str = "",
+    date_from: str = "",
+    date_to: str = "",
+    branch_ids: str = "",
+    status_id: str = ""
+) -> str:
+    """
+    List Purchase Requests from ESB Core. Returns branchID, branchName, status, and PR details.
+    Optionally filter by purchase_request_num, date_from/date_to (YYYY-MM-DD), branch_ids, or status_id
+    (1=New, 2=Rejected, 3=Authorized, 25=Closed, 30=Partially Completed, 31=Completed).
+    """
+    token = get_esb_token()
+    if not token:
+        return "Authentication Failure: Could not get login token from ESB Core."
+    url = f"{ESB_BASE_URL}/purchase/purchase-request"
+    params = {"limit": 50}
+    if purchase_request_num:
+        params["purchaseRequestNum"] = purchase_request_num
+    if date_from:
+        params["purchaseRequestDateFrom"] = date_from
+    if date_to:
+        params["purchaseRequestDateTo"] = date_to
+    if branch_ids:
+        params["branchIDs"] = branch_ids
+    if status_id:
+        params["statusID"] = status_id
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+    try:
+        response = requests.get(url, headers=headers, params=params, timeout=15)
+        if response.status_code == 200:
+            return f"Purchase Requests: {response.json().get('result', 'No data found')}"
+        return f"ESB Error {response.status_code}: {response.text}"
+    except Exception as e:
+        return f"Network error: {str(e)}"
  
 @mcp.tool()
 def check_stock_movement(start_period: str, end_period: str = "", branch_code: str = "", product_name: str = "") -> str:
