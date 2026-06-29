@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Purchase Request — Statement Coffee</title>
+<style>
+/* ── CONFIG ──────────────────────────────── */
+:root{--green:#1a4731;--green-light:#e8f5e9;--amber:#f59e0b;--red:#e53935;--grey:#f5f4f0;--border:#e0ddd6;--text:#222;--sub:#888;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--grey);color:var(--text);font-size:13px;min-height:100vh;}
+
+/* ── HEADER ─────────────────────────────── */
+.header{background:var(--green);color:#fff;padding:14px 20px;display:flex;align-items:center;gap:14px;}
+.header h1{font-size:17px;font-weight:600;letter-spacing:.3px;}
+.header .sub{font-size:11px;opacity:.7;margin-top:2px;}
+.badge-dept{background:rgba(255,255,255,.15);border-radius:20px;padding:3px 10px;font-size:11px;}
+
+/* ── CARD ────────────────────────────────── */
+.card{background:#fff;border-radius:10px;border:1px solid var(--border);padding:18px 20px;margin:16px;}
+.card h2{font-size:14px;font-weight:600;color:var(--green);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border);}
+
+/* ── CONTROLS ────────────────────────────── */
+.controls{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px;}
+label.lbl{font-size:11px;font-weight:600;color:#555;display:block;margin-bottom:4px;}
+input[type=date],input[type=text],select{border:1px solid var(--border);border-radius:6px;padding:7px 10px;font-size:13px;background:#fafafa;font-family:inherit;width:100%;}
+input[type=date]{width:160px;}
+
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:6px;border:none;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;}
+.btn-green{background:var(--green);color:#fff;}
+.btn-green:hover{background:#245c3f;}
+.btn-green:disabled{opacity:.5;cursor:not-allowed;}
+.btn-outline{background:#fff;color:var(--green);border:1.5px solid var(--green);}
+.btn-outline:hover{background:var(--green-light);}
+
+/* ── STATUS BAR ──────────────────────────── */
+.status-bar{font-size:12px;color:var(--sub);min-height:20px;margin-bottom:10px;display:flex;align-items:center;gap:8px;}
+.status-bar .dot{width:8px;height:8px;border-radius:50%;background:var(--sub);flex-shrink:0;}
+.status-bar.loading .dot{background:var(--amber);animation:pulse 1s infinite;}
+.status-bar.ok .dot{background:#43a047;}
+.status-bar.err .dot{background:var(--red);}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* ── TABLE ────────────────────────────────── */
+.tbl-wrap{overflow-x:auto;}
+table{width:100%;border-collapse:collapse;font-size:12px;}
+th{background:#f0ede8;text-align:left;padding:8px 10px;font-weight:600;font-size:11px;color:#555;border-bottom:2px solid var(--border);white-space:nowrap;}
+td{padding:8px 10px;border-bottom:1px solid #f0ede8;vertical-align:middle;}
+tr:last-child td{border-bottom:none;}
+tr.below-par td:first-child{font-weight:600;}
+tr.safe{opacity:.45;}
+.stock-low{color:var(--red);font-weight:700;}
+.stock-ok{color:#43a047;}
+
+input.qty-input{width:72px;border:1.5px solid #ccc;border-radius:5px;padding:5px 8px;font-size:13px;font-weight:700;text-align:center;font-family:inherit;}
+input.qty-input:focus{outline:none;border-color:var(--green);}
+input.notes-input{width:100px;border:1px solid #e0ddd6;border-radius:5px;padding:5px 8px;font-size:11px;font-family:inherit;background:#fafafa;}
+
+/* ── RESULT ──────────────────────────────── */
+.result-box{background:var(--green-light);border:1px solid #a5d6a7;border-radius:8px;padding:16px 18px;margin-top:14px;}
+.result-box h3{color:#2e7d32;font-size:14px;margin-bottom:6px;}
+.result-box p{font-size:12px;color:#444;line-height:1.6;}
+.result-box strong{color:#1b5e20;}
+
+/* ── EMPTY ──────────────────────────────── */
+.empty{text-align:center;padding:32px;color:var(--sub);}
+.empty .icon{font-size:32px;margin-bottom:8px;}
+
+/* ── FOOTER ──────────────────────────────── */
+.footer{text-align:center;font-size:10px;color:#bbb;padding:16px;margin-top:8px;}
+
+/* ── DEPT SELECTOR ──────────────────────── */
+.dept-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;}
+.dept-chip{padding:5px 14px;border-radius:20px;border:1.5px solid var(--border);background:#fff;cursor:pointer;font-size:12px;font-weight:600;color:#555;transition:all .15s;}
+.dept-chip.active{border-color:var(--green);background:var(--green);color:#fff;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>&#128230; Purchase Request</h1>
+    <div class="sub">Statement Coffee — Internal Ordering App</div>
+  </div>
+  <div style="margin-left:auto;display:flex;align-items:center;gap:8px">
+    <span id="headerDept" class="badge-dept">All Items</span>
+  </div>
+</div>
+
+<div class="card">
+  <h2>&#128203; Filter &amp; Department</h2>
+  <div class="dept-row" id="deptRow">
+    <button class="dept-chip active" onclick="setDept('')" data-dept="">Semua</button>
+  </div>
+  <div class="controls">
+    <div>
+      <label class="lbl">Required Date</label>
+      <input type="date" id="requiredDate">
+    </div>
+    <button class="btn btn-green" id="btnCalc" onclick="calcSuggestions()">&#128260; Hitung Stok &amp; Sarankan</button>
+    <label style="font-size:12px;color:var(--sub);align-self:center;cursor:pointer">
+      <input type="checkbox" id="showAll" onchange="renderTable()"> Tampilkan item stok aman
+    </label>
+  </div>
+  <div class="status-bar" id="statusBar"><div class="dot"></div><span id="statusText">Pilih tanggal lalu klik Hitung Stok.</span></div>
+</div>
+
+<div class="card" id="reviewCard" style="display:none">
+  <h2>&#128203; Review Order</h2>
+  <div class="tbl-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th style="width:28%">Item</th>
+        <th style="width:14%">Stok ESB</th>
+        <th style="width:9%">Par Min</th>
+        <th style="width:9%">Par Max</th>
+        <th style="width:12%">Saran Order</th>
+        <th style="width:10%">Unit</th>
+        <th style="width:11%">Notes</th>
+        <th style="width:4%;text-align:center">&#10003;</th>
+      </tr>
+    </thead>
+    <tbody id="reviewBody"></tbody>
+  </table>
+  </div>
+
+  <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;padding-top:12px;border-top:1px solid var(--border)">
+    <button class="btn btn-green" id="btnSubmit" onclick="submitPR()">&#128228; Kirim Purchase Request ke ESB</button>
+    <button class="btn btn-outline" onclick="selectAll(true)">Pilih Semua</button>
+    <button class="btn btn-outline" onclick="selectAll(false)">Reset Pilihan</button>
+    <span id="selectedCount" style="font-size:12px;color:var(--sub);margin-left:4px"></span>
+  </div>
+
+  <div id="resultBox" style="display:none" class="result-box">
+    <h3 id="resultTitle"></h3>
+    <p id="resultBody"></p>
+    <button class="btn btn-outline" style="margin-top:10px;font-size:12px" onclick="document.getElementById('resultBox').style.display='none'">Tutup</button>
+  </div>
+</div>
+
+<div class="footer">Statement Coffee Internal Tool &nbsp;|&nbsp; ESB ERP Integration</div>
+
+<script>
+/* ══════════════════════════════════════════════
+   CONFIGURATION — edit this section before distributing
+   ══════════════════════════════════════════════ */
+const ESB_BASE    = 'https://services.esb.co.id/core';
+const ESB_USER    = 'STMTSUPERADMIN';   // ← ganti
+const ESB_PASS    = 'PrestakaKopi2025!*';   // ← ganti
+const BRANCH_ID   = 2;                       // 2 = Statement Coffee
+
+/* PR Catalog — tambah/kurangi item di sini
+   productDetailID : ID dari ESB product detail (untuk create PR)
+   stockProductID  : productID untuk stock movement API
+   parMin / parMax : dalam satuan stok ESB (misal: Pcs, Gram, kg)
+   divisor         : unit stok per unit order (Pcs→Pack30 = 30)
+   orderUnit       : label unit order yang tampil ke user
+   dept            : filter department (kosong = semua, atau "KITCHEN","BAR","DRY",dll)
+   requestProcessID: 1=ALL, 2=Purchase, 3=Transfer                     */
+const PR_CATALOG = [
+  {id:'prc_telur_biasa',    n:'Telur Biasa (Regular)',    dept:'KITCHEN', productDetailID:1614, stockProductID:833,  parMin:60,  parMax:240, divisor:30,  orderUnit:'pack (30pcs)', requestProcessID:2},
+  // tambah item lain di bawah ini, contoh:
+  // {id:'prc_minyak',      n:'Minyak Goreng',            dept:'KITCHEN', productDetailID:XXXX, stockProductID:XXXX, parMin:2,   parMax:8,   divisor:1,   orderUnit:'jerigen',      requestProcessID:2},
+  // {id:'prc_kopi_hb',     n:'Kopi House Blend',         dept:'BAR',     productDetailID:XXXX, stockProductID:XXXX, parMin:500, parMax:2000,divisor:1000,orderUnit:'kg',           requestProcessID:2},
+];
+/* ══════════════════════════════════════════════ */
+
+let esbToken     = null;
+let tokenExpiry  = 0;
+let suggestions  = [];
+let activeDept   = '';
+
+/* ── Auth ─────────────────────────────────── */
+async function getToken(){
+  if(esbToken && Date.now() < tokenExpiry) return esbToken;
+  const r = await fetch(ESB_BASE+'/auth/login',{
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({username:ESB_USER, password:ESB_PASS})
+  });
+  if(!r.ok) throw new Error('Login ESB gagal ('+r.status+'). Hubungi admin.');
+  const d = await r.json();
+  const tok = d?.result?.token || d?.token;
+  if(!tok) throw new Error('Token tidak ditemukan dalam response ESB.');
+  esbToken   = tok;
+  tokenExpiry = Date.now() + 50*60*1000; // 50 min
+  return tok;
+}
+
+/* ── Dept chips ───────────────────────────── */
+function buildDeptChips(){
+  const depts = [...new Set(PR_CATALOG.map(i=>i.dept||'').filter(Boolean))];
+  const row = document.getElementById('deptRow');
+  row.innerHTML = '<button class="dept-chip active" onclick="setDept('')" data-dept="">Semua</button>';
+  depts.forEach(d=>{
+    const b = document.createElement('button');
+    b.className = 'dept-chip';
+    b.textContent = d;
+    b.dataset.dept = d;
+    b.onclick = ()=>setDept(d);
+    row.appendChild(b);
+  });
+}
+function setDept(d){
+  activeDept = d;
+  document.querySelectorAll('.dept-chip').forEach(b=>b.classList.toggle('active', b.dataset.dept===d));
+  document.getElementById('headerDept').textContent = d || 'All Items';
+  if(suggestions.length) renderTable();
+}
+
+/* ── Calc ─────────────────────────────────── */
+async function calcSuggestions(){
+  const catalog = PR_CATALOG.filter(i=>!activeDept||(i.dept||'')==activeDept);
+  if(!catalog.length){ setStatus('Tidak ada item untuk department ini.',''); return; }
+  const btn = document.getElementById('btnCalc');
+  btn.disabled = true; btn.textContent = 'Loading...';
+  setStatus('Menghubungi ESB...','loading');
+  suggestions = [];
+  try{
+    const token = await getToken();
+    const today = new Date().toISOString().slice(0,10);
+    for(let i=0;i<catalog.length;i++){
+      const item = catalog[i];
+      setStatus('Ambil stok: '+item.n+' ('+(i+1)+'/'+catalog.length+')...','loading');
+      let stockQty=null, uom='', err='';
+      if(!item.stockProductID){ err='Product ID belum diisi'; }
+      else{
+        try{
+          const url=ESB_BASE+'/stock/stock-movement?productID='+item.stockProductID+'&branchID='+BRANCH_ID+'&documentDateFrom='+today+'&documentDateTo='+today+'&limit=1';
+          const r=await fetch(url,{headers:{Authorization:'Bearer '+token}});
+          if(r.ok){
+            const data=await r.json(); const res=data?.result;
+            if(Array.isArray(res)&&res.length){ stockQty=parseFloat(res[0].qtyBalance)||0; uom=res[0].uom||''; }
+            else{ stockQty=0; uom=''; err='Tidak ada data stok'; }
+          }else{ err='HTTP '+r.status; }
+        }catch(e){ err=e.message; }
+      }
+      const stock = stockQty!=null ? stockQty : 0;
+      const needsOrder = stockQty!=null && stock<item.parMin;
+      const rawSugg = item.parMax - stock;
+      const sugQty = needsOrder&&rawSugg>0 ? Math.ceil(rawSugg/item.divisor) : 0;
+      suggestions.push({item,stock:stockQty,uom,err,sugQty,needsOrder,userQty:sugQty,include:needsOrder&&sugQty>0,notes:''});
+      await new Promise(r=>setTimeout(r,150));
+    }
+    const n = suggestions.filter(s=>s.needsOrder).length;
+    setStatus('Selesai. '+n+' item perlu di-order.'+(n===0?' Semua stok aman!':''),'ok');
+    document.getElementById('reviewCard').style.display='';
+    renderTable();
+  }catch(e){
+    let msg=e.message;
+    if(msg.includes('Failed to fetch')||msg.toLowerCase().includes('cors')||msg.includes('Load failed')){
+      msg='Tidak bisa terhubung ke ESB. Pastikan device terhubung internet dan ESB tidak sedang maintenance.';
+    }
+    setStatus(msg,'err');
+  }finally{
+    btn.disabled=false; btn.textContent='Hitung Stok & Sarankan';
+  }
+}
+
+/* ── Render table ─────────────────────────── */
+function renderTable(){
+  const tbody = document.getElementById('reviewBody');
+  const showAll = document.getElementById('showAll').checked;
+  tbody.innerHTML='';
+  let shown=0;
+  suggestions.forEach((s,idx)=>{
+    if(!showAll&&!s.needsOrder) return;
+    shown++;
+    const hasErr = s.err&&s.stock==null;
+    const stockTxt = hasErr
+      ? '<span style="color:var(--red);font-size:10px">'+esc(s.err)+'</span>'
+      : '<span class="'+(s.needsOrder?'stock-low':'stock-ok')+'">'+
+          (s.stock!=null?fmt(s.stock):'—')+' '+esc(s.uom)+'</span>';
+    const tr=document.createElement('tr');
+    tr.className=s.needsOrder?'below-par':'safe';
+    tr.innerHTML=
+      '<td>'+esc(s.item.n)+(s.item.dept?'<span style="margin-left:6px;font-size:9px;background:#f0ede8;padding:1px 5px;border-radius:10px;color:#888">'+esc(s.item.dept)+'</span>':'')+'</td>'+
+      '<td>'+stockTxt+'</td>'+
+      '<td style="color:var(--sub)">'+fmt(s.item.parMin)+'</td>'+
+      '<td style="color:var(--sub)">'+fmt(s.item.parMax)+'</td>'+
+      '<td><input class="qty-input" type="number" min="0" step="1" value="'+s.userQty+'" '+
+        'onchange="suggestions['+idx+'].userQty=Math.max(0,parseFloat(this.value)||0);updateCount()"></td>'+
+      '<td style="color:#555;font-size:11px">'+esc(s.item.orderUnit)+'</td>'+
+      '<td><input class="notes-input" type="text" placeholder="—" '+
+        'onchange="suggestions['+idx+'].notes=this.value"></td>'+
+      '<td style="text-align:center"><input type="checkbox" '+(s.include?'checked':'')+' '+
+        'style="width:16px;height:16px;cursor:pointer" '+
+        'onchange="suggestions['+idx+'].include=this.checked;updateCount()"></td>';
+    tbody.appendChild(tr);
+  });
+  if(!shown){
+    tbody.innerHTML='<tr><td colspan="8" class="empty"><div class="icon">&#10003;</div>Semua item stok aman — tidak ada yang perlu di-order.</td></tr>';
+  }
+  updateCount();
+}
+
+/* ── Helpers ──────────────────────────────── */
+function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function fmt(n){return(n||0).toLocaleString('id-ID');}
+function setStatus(msg,type){
+  const bar=document.getElementById('statusBar');
+  const txt=document.getElementById('statusText');
+  bar.className='status-bar'+(type?' '+type:'');
+  txt.textContent=msg;
+}
+function updateCount(){
+  const inc=suggestions.filter(s=>s.include&&s.userQty>0);
+  document.getElementById('selectedCount').textContent=inc.length?inc.length+' item dipilih':'';
+}
+function selectAll(v){
+  suggestions.forEach(s=>{if(s.needsOrder||v===false)s.include=v;});
+  renderTable();
+}
+
+/* ── Submit ───────────────────────────────── */
+async function submitPR(){
+  const included=suggestions.filter(s=>s.include&&s.userQty>0);
+  if(!included.length){alert('Pilih minimal 1 item dengan qty > 0.');return;}
+  const rd=document.getElementById('requiredDate').value;
+  if(!rd){alert('Isi Required Date terlebih dahulu.');return;}
+  const lines=included.map(s=>'  - '+s.item.n+' x'+s.userQty+' '+s.item.orderUnit).join('\n');
+  if(!confirm('Kirim Purchase Request '+included.length+' item ke ESB?\n\n'+lines))return;
+  const btn=document.getElementById('btnSubmit');
+  btn.disabled=true; btn.textContent='Mengirim...';
+  try{
+    const token=await getToken();
+    const today=new Date().toISOString().slice(0,10);
+    const details=included.map(s=>({
+      productDetailID:s.item.productDetailID,
+      requestProcessID:s.item.requestProcessID||2,
+      qty:s.userQty,
+      notes:s.notes||''
+    }));
+    const r=await fetch(ESB_BASE+'/purchase/purchase-request',{
+      method:'POST',
+      headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},
+      body:JSON.stringify({branchID:BRANCH_ID,purchaseRequestDate:today,requiredDate:rd,purchaseRequestDetails:details,isTemplate:false})
+    });
+    const data=await r.json();
+    if(r.ok){
+      const res=data?.result;
+      const prNum=res?.purchaseRequestNum||res?.purchaseRequestNumber||JSON.stringify(res);
+      document.getElementById('resultTitle').textContent='Purchase Request Berhasil Dibuat!';
+      document.getElementById('resultBody').innerHTML=
+        'Nomor PR: <strong>'+esc(String(prNum))+'</strong><br>'+
+        'Items: '+included.map(s=>esc(s.item.n)+' x'+s.userQty).join(', ')+'<br>'+
+        'Required Date: '+rd+'<br>'+
+        '<em style="color:#666;font-size:11px">Cek di ESB ERP &rarr; Purchase Request untuk review &amp; approve.</em>';
+      document.getElementById('resultBox').style.display='';
+      suggestions.forEach(s=>s.include=false);
+      renderTable();
+    }else{
+      throw new Error('ESB Error '+r.status+': '+(data?.message||JSON.stringify(data)));
+    }
+  }catch(e){
+    alert('Gagal mengirim PR:\n'+e.message);
+  }finally{
+    btn.disabled=false; btn.textContent='Kirim Purchase Request ke ESB';
+  }
+}
+
+/* ── Init ─────────────────────────────────── */
+document.addEventListener('DOMContentLoaded',()=>{
+  buildDeptChips();
+  const d=new Date(); d.setDate(d.getDate()+3);
+  document.getElementById('requiredDate').value=d.toISOString().slice(0,10);
+});
+</script>
+</body>
+</html>
