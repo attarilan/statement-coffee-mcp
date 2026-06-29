@@ -25,7 +25,8 @@ def get_esb_token():
         return None
     except Exception:
         return None
- @mcp.tool()
+     
+@mcp.tool()
 def get_product_detail(product_id: int) -> str:
     """
     Get full product detail from ESB Core by productID, including all productDetailIDs with their
