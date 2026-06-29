@@ -26,7 +26,61 @@ def get_esb_token():
     except Exception:
         return None
  
- 
+@mcp.tool()
+def create_purchase_request(
+    branch_id: int,
+    purchase_request_date: str,
+    required_date: str,
+    cost_center_id: int,
+    purchase_request_details: str,
+    project_id: int = 0,
+    request_template_id: int = 0,
+    additional_info: str = "",
+    is_template: bool = False
+) -> str:
+    """
+    Create a Purchase Request in ESB Core.
+    purchase_request_date and required_date must be in YYYY-MM-DD format.
+    purchase_request_details is a JSON array of objects, each with:
+      - productDetailID (int)
+      - requestProcessID (int): 1=ALL, 2=Purchase, 3=Transfer
+      - qty (float)
+      - notes (str, optional)
+    Example: '[{"productDetailID": 123, "requestProcessID": 1, "qty": 5.0, "notes": "urgent"}]'
+    """
+    token = get_esb_token()
+    if not token:
+        return "Authentication Failure: Could not get login token from ESB Core."
+
+    try:
+        details = json.loads(purchase_request_details)
+    except Exception:
+        return "Error: purchase_request_details must be a valid JSON array."
+
+    payload = {
+        "branchID": branch_id,
+        "purchaseRequestDate": purchase_request_date,
+        "requiredDate": required_date,
+        "costCenterID": cost_center_id,
+        "purchaseRequestDetails": details,
+        "isTemplate": is_template,
+    }
+    if project_id:
+        payload["projectID"] = project_id
+    if request_template_id:
+        payload["requestTemplateID"] = request_template_id
+    if additional_info:
+        payload["additionalInfo"] = additional_info
+
+    url = f"{ESB_BASE_URL}/purchase/purchase-request"
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+    try:
+        response = requests.post(url, headers=headers, json=payload, timeout=15)
+        if response.status_code == 200:
+            return f"Purchase Request created: {response.json().get('result', response.json())}"
+        return f"ESB Error {response.status_code}: {response.text}"
+    except Exception as e:
+        return f"Network error: {str(e)}" 
  
 @mcp.tool()
 def get_daily_sales(branch_id: str, date_from: str, date_to: str = "") -> str:
