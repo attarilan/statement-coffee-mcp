@@ -25,7 +25,26 @@ def get_esb_token():
         return None
     except Exception:
         return None
- 
+ @mcp.tool()
+def get_product_detail(product_id: int) -> str:
+    """
+    Get full product detail from ESB Core by productID, including all productDetailIDs with their
+    unit names (uomName), flagDefaultPurchase, and flagActive. Use this to find the correct
+    productDetailID to use in purchase requests or BOMs.
+    """
+    token = get_esb_token()
+    if not token:
+        return "Authentication Failure: Could not get login token from ESB Core."
+    url = f"{ESB_BASE_URL}/product/{product_id}"
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+    try:
+        response = requests.get(url, headers=headers, timeout=15)
+        if response.status_code == 200:
+            return f"Product detail: {response.json().get('result', 'No data found')}"
+        return f"ESB Error {response.status_code}: {response.text}"
+    except Exception as e:
+        return f"Network error: {str(e)}"
+     
 @mcp.tool()
 def create_purchase_request(
     branch_id: int,
