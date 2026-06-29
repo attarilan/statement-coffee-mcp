@@ -31,8 +31,8 @@ def create_purchase_request(
     branch_id: int,
     purchase_request_date: str,
     required_date: str,
-    cost_center_id: int,
     purchase_request_details: str,
+    cost_center_id: int = 0,
     project_id: int = 0,
     request_template_id: int = 0,
     additional_info: str = "",
@@ -51,27 +51,25 @@ def create_purchase_request(
     token = get_esb_token()
     if not token:
         return "Authentication Failure: Could not get login token from ESB Core."
-
     try:
         details = json.loads(purchase_request_details)
     except Exception:
         return "Error: purchase_request_details must be a valid JSON array."
-
     payload = {
         "branchID": branch_id,
         "purchaseRequestDate": purchase_request_date,
         "requiredDate": required_date,
-        "costCenterID": cost_center_id,
         "purchaseRequestDetails": details,
         "isTemplate": is_template,
     }
+    if cost_center_id:
+        payload["costCenterID"] = cost_center_id
     if project_id:
         payload["projectID"] = project_id
     if request_template_id:
         payload["requestTemplateID"] = request_template_id
     if additional_info:
         payload["additionalInfo"] = additional_info
-
     url = f"{ESB_BASE_URL}/purchase/purchase-request"
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
     try:
