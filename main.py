@@ -360,7 +360,18 @@ def update_bom_name(bom_id: str, new_bom_name: str) -> str:
         def safe_float(val, default=0.0):
             try: return float(val) if val not in (None, '') else default
             except: return default
-        update_payload = {"bomName": new_bom_name, "bomCode": bom_data.get('bomCode') or '', "bomTypeID": safe_int(bom_data.get('bomTypeID'), 3), "productDetailID": bom_data.get('productDetailID') or None, "notes": bom_data.get('notes') or '', "bomCostTotal": safe_float(bom_data.get('bomCostTotal'), 0), "accessType": safe_int(bom_data.get('accessType'), 0), "bomDetails": bom_data.get('bomDetails') or [], "bomCosts": bom_data.get('bomCosts') or [], "selectedUserAccess": bom_data.get('selectedUserAccess') or []}
+        update_payload = {
+            "bomName": new_bom_name,
+            "bomCode": bom_data.get('bomCode') or '',
+            "bomTypeID": safe_int(bom_data.get('bomTypeID'), 3),
+            "productDetailID": bom_data.get('productDetailID') or None,
+            "notes": bom_data.get('notes') or '',
+            "bomCostTotal": safe_float(bom_data.get('bomCostTotal'), 0),
+            "accessType": safe_int(bom_data.get('accessType'), 0),
+            "bomDetails": bom_data.get('bomDetails') or [],
+            "bomCosts": bom_data.get('bomCosts') or [],
+            "selectedUserAccess": bom_data.get('selectedUserAccess') or []
+        }
         put_response = requests.put(get_url, json=update_payload, headers=headers, timeout=15)
         if put_response.status_code == 200:
             return f"SUCCESS: BOM {bom_id} renamed to '{new_bom_name}'"
@@ -421,20 +432,27 @@ class MCPWrapper:
 
         if path == "/.well-known/oauth-protected-resource" or \
            path.startswith("/.well-known/oauth-protected-resource/"):
-            body = json.dumps({"resource": "https://statement-coffee-mcp.onrender.com", "authorization_servers": []}).encode()
-            await send({"type": "http.response.start", "status": 200, "headers": [(b"content-type", b"application/json"), (b"content-length", str(len(body)).encode())]})
+            body = json.dumps({
+                "resource": "https://statement-coffee-mcp.onrender.com",
+                "authorization_servers": []
+            }).encode()
+            await send({"type": "http.response.start", "status": 200,
+                        "headers": [(b"content-type", b"application/json"),
+                                    (b"content-length", str(len(body)).encode())]})
             await send({"type": "http.response.body", "body": body})
             return
 
+        # ── Proxy: GET /api/stock ──────────────────────────────────────────
         if path == "/api/stock":
             if method == "OPTIONS":
-                await send({"type": "http.response.start", "status": 200, "headers": CORS_HEADERS + [(b"content-length", b"0")]})
+                await send({"type": "http.response.start", "status": 200,
+                            "headers": CORS_HEADERS + [(b"content-length", b"0")]})
                 await send({"type": "http.response.body", "body": b""})
                 return
             qs = urllib.parse.parse_qs(scope.get("query_string", b"").decode())
             product_id = qs.get("productID", [None])[0]
-            branch_id = qs.get("branchID", ["2"])[0]
-            date_str = qs.get("date", [""])[0]
+            branch_id  = qs.get("branchID",  ["2"])[0]
+            date_str   = qs.get("date",       [""])[0]
             if not date_str:
                 from datetime import date
                 date_str = date.today().isoformat()
@@ -446,15 +464,23 @@ class MCPWrapper:
                 await json_response(send, {"error": "ESB auth failed"}, 500)
                 return
             try:
-                r = requests.get(f"{ESB_BASE_URL}/stock/stock-movement", headers={"Authorization": f"Bearer {token}"}, params={"productID": product_id, "branchID": branch_id, "documentDateFrom": date_str, "documentDateTo": date_str, "limit": 1}, timeout=15)
+                r = requests.get(
+                    f"{ESB_BASE_URL}/stock/stock-movement",
+                    headers={"Authorization": f"Bearer {token}"},
+                    params={"productID": product_id, "branchID": branch_id,
+                            "documentDateFrom": date_str, "documentDateTo": date_str, "limit": 1},
+                    timeout=15
+                )
                 await json_response(send, r.json(), r.status_code)
             except Exception as e:
                 await json_response(send, {"error": str(e)}, 500)
             return
 
+        # ── Proxy: POST /api/purchase-request ─────────────────────────────
         if path == "/api/purchase-request":
             if method == "OPTIONS":
-                await send({"type": "http.response.start", "status": 200, "headers": CORS_HEADERS + [(b"content-length", b"0")]})
+                await send({"type": "http.response.start", "status": 200,
+                            "headers": CORS_HEADERS + [(b"content-length", b"0")]})
                 await send({"type": "http.response.body", "body": b""})
                 return
             body_bytes = await read_body(receive)
@@ -468,12 +494,17 @@ class MCPWrapper:
                 await json_response(send, {"error": "ESB auth failed"}, 500)
                 return
             try:
-                r = requests.post(f"{ESB_BASE_URL}/purchase/purchase-request", headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"}, json=body_data, timeout=30)
+                r = requests.post(
+                    f"{ESB_BASE_URL}/purchase/purchase-request",
+                    headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+                    json=body_data, timeout=30
+                )
                 await json_response(send, r.json(), r.status_code)
             except Exception as e:
                 await json_response(send, {"error": str(e)}, 500)
             return
 
+        # Fix host header for MCP security check
         port = int(os.getenv("PORT", 8000))
         patched_headers = []
         for key, value in scope.get("headers", []):
@@ -483,6 +514,7 @@ class MCPWrapper:
                 patched_headers.append((key, value))
         scope = dict(scope)
         scope["headers"] = patched_headers
+
         await self.app(scope, receive, send)
 
 
