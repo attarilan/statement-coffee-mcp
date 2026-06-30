@@ -4,9 +4,9 @@ import urllib.parse
 import requests
 import uvicorn
 from mcp.server.fastmcp import FastMCP
- 
+
 mcp = FastMCP("Statement Coffee ESB Core")
- 
+
 ESB_BASE_URL = os.getenv("ESB_BASE_URL", "https://services.esb.co.id/core").rstrip("/")
 ESB_BASE_URL_EXT = os.getenv("ESB_BASE_URL_EXT", "https://core-api.esb.co.id").rstrip("/")
 ESB_USERNAME = os.getenv("ESB_USERNAME", "")
@@ -53,11 +53,7 @@ async def json_response(send, data, status=200):
 
 @mcp.tool()
 def get_product_detail(product_id: int) -> str:
-    """
-    Get full product detail from ESB Core by productID, including all productDetailIDs with their
-    unit names (uomName), flagDefaultPurchase, and flagActive. Use this to find the correct
-    productDetailID to use in purchase requests or BOMs.
-    """
+    """Get full product detail from ESB Core by productID, including all productDetailIDs with their unit names (uomName), flagDefaultPurchase, and flagActive."""
     token = get_esb_token()
     if not token:
         return "Authentication Failure: Could not get login token from ESB Core."
@@ -83,16 +79,7 @@ def create_purchase_request(
     additional_info: str = "",
     is_template: bool = False
 ) -> str:
-    """
-    Create a Purchase Request in ESB Core.
-    purchase_request_date and required_date must be in YYYY-MM-DD format.
-    purchase_request_details is a JSON array of objects, each with:
-      - productDetailID (int)
-      - requestProcessID (int): 1=ALL, 2=Purchase, 3=Transfer
-      - qty (float)
-      - notes (str, optional)
-    Example: '[{"productDetailID": 123, "requestProcessID": 1, "qty": 5.0, "notes": "urgent"}]'
-    """
+    """Create a Purchase Request in ESB Core. purchase_request_details is a JSON array: [{productDetailID, requestProcessID, qty, notes}]"""
     token = get_esb_token()
     if not token:
         return "Authentication Failure: Could not get login token from ESB Core."
@@ -107,14 +94,10 @@ def create_purchase_request(
         "purchaseRequestDetails": details,
         "isTemplate": is_template,
     }
-    if cost_center_id:
-        payload["costCenterID"] = cost_center_id
-    if project_id:
-        payload["projectID"] = project_id
-    if request_template_id:
-        payload["requestTemplateID"] = request_template_id
-    if additional_info:
-        payload["additionalInfo"] = additional_info
+    if cost_center_id: payload["costCenterID"] = cost_center_id
+    if project_id: payload["projectID"] = project_id
+    if request_template_id: payload["requestTemplateID"] = request_template_id
+    if additional_info: payload["additionalInfo"] = additional_info
     url = f"{ESB_BASE_URL}/purchase/purchase-request"
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
     try:
@@ -127,7 +110,7 @@ def create_purchase_request(
 
 @mcp.tool()
 def get_daily_sales(branch_id: str, date_from: str, date_to: str = "") -> str:
-    """Get Simple Sales transactions for a Statement Coffee branch. Use dateFrom and dateTo in YYYY-MM-DD format. date_to defaults to same as date_from if not provided."""
+    """Get Simple Sales transactions for a Statement Coffee branch. Use dateFrom and dateTo in YYYY-MM-DD format."""
     token = get_esb_token()
     if not token:
         return "Authentication Failure: Could not get login token from ESB Core."
@@ -152,26 +135,17 @@ def list_purchase_requests(
     branch_ids: str = "",
     status_id: str = ""
 ) -> str:
-    """
-    List Purchase Requests from ESB Core. Returns branchID, branchName, status, and PR details.
-    Optionally filter by purchase_request_num, date_from/date_to (YYYY-MM-DD), branch_ids, or status_id
-    (1=New, 2=Rejected, 3=Authorized, 25=Closed, 30=Partially Completed, 31=Completed).
-    """
+    """List Purchase Requests from ESB Core. status_id: 1=New, 2=Rejected, 3=Authorized, 25=Closed, 30=Partially Completed, 31=Completed."""
     token = get_esb_token()
     if not token:
         return "Authentication Failure: Could not get login token from ESB Core."
     url = f"{ESB_BASE_URL}/purchase/purchase-request"
     params = {"limit": 50}
-    if purchase_request_num:
-        params["purchaseRequestNum"] = purchase_request_num
-    if date_from:
-        params["purchaseRequestDateFrom"] = date_from
-    if date_to:
-        params["purchaseRequestDateTo"] = date_to
-    if branch_ids:
-        params["branchIDs"] = branch_ids
-    if status_id:
-        params["statusID"] = status_id
+    if purchase_request_num: params["purchaseRequestNum"] = purchase_request_num
+    if date_from: params["purchaseRequestDateFrom"] = date_from
+    if date_to: params["purchaseRequestDateTo"] = date_to
+    if branch_ids: params["branchIDs"] = branch_ids
+    if status_id: params["statusID"] = status_id
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
     try:
         response = requests.get(url, headers=headers, params=params, timeout=15)
@@ -183,7 +157,7 @@ def list_purchase_requests(
 
 @mcp.tool()
 def check_stock_movement(start_period: str, end_period: str = "", branch_code: str = "", product_name: str = "") -> str:
-    """Get stock movement report from ESB Core. Use start_period and end_period in YYYY-MM-DD format. branch_code and product_name are optional filters."""
+    """Get stock movement report from ESB Core. Use start_period and end_period in YYYY-MM-DD format."""
     token = get_esb_token()
     if not token:
         return "Authentication Failure: Could not get login token from ESB Core."
@@ -191,10 +165,8 @@ def check_stock_movement(start_period: str, end_period: str = "", branch_code: s
         end_period = start_period
     url = f"{ESB_BASE_URL}/report/stock-movement"
     params = {"startPeriod": start_period, "endPeriod": end_period, "limit": 100}
-    if branch_code:
-        params["branchCode"] = branch_code
-    if product_name:
-        params["productName"] = product_name
+    if branch_code: params["branchCode"] = branch_code
+    if product_name: params["productName"] = product_name
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
     try:
         response = requests.get(url, headers=headers, params=params, timeout=15)
@@ -206,16 +178,14 @@ def check_stock_movement(start_period: str, end_period: str = "", branch_code: s
 
 @mcp.tool()
 def list_bill_of_materials(product_name: str = "", bom_id: str = "", flag_active: str = "1") -> str:
-    """List Bill of Materials from ESB Core. Optionally filter by product_name, bom_id, or flag_active (1=Active, 2=Not Active)."""
+    """List Bill of Materials from ESB Core."""
     token = get_esb_token()
     if not token:
         return "Authentication Failure: Could not get login token from ESB Core."
     url = f"{ESB_BASE_URL}/product/bom"
     params = {"limit": 100, "flagActive": flag_active}
-    if product_name:
-        params["productName"] = product_name
-    if bom_id:
-        params["bomID"] = bom_id
+    if product_name: params["productName"] = product_name
+    if bom_id: params["bomID"] = bom_id
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
     try:
         response = requests.get(url, headers=headers, params=params, timeout=15)
@@ -242,23 +212,8 @@ def get_bill_of_material_detail(bom_id: str) -> str:
         return f"Network error: {str(e)}"
 
 @mcp.tool()
-def create_bill_of_material(
-    bom_type: str,
-    bom_name: str,
-    bom_cost_total: float,
-    access_type: int,
-    bom_details: str,
-    bom_code: str = "",
-    notes: str = "",
-    bom_costs: str = ""
-) -> str:
-    """
-    Create a new Bill of Material in ESB Core.
-    bom_type must be 'menu' (3), 'assembly' (1), or 'disassembly' (2).
-    bom_details is a JSON array of objects with keys: ID, productDetailID, lastHPP, qty, yieldPercent, printGroup (opt).
-    bom_costs is an optional JSON array with keys: ID, costDescription, coaNo, costTotal.
-    access_type: 0=all users, 1=specific users only.
-    """
+def create_bill_of_material(bom_type: str, bom_name: str, bom_cost_total: float, access_type: int, bom_details: str, bom_code: str = "", notes: str = "", bom_costs: str = "") -> str:
+    """Create a new Bill of Material. bom_type: 'menu', 'assembly', or 'disassembly'."""
     token = get_esb_token()
     if not token:
         return "Authentication Failure: Could not get login token from ESB Core."
@@ -270,23 +225,12 @@ def create_bill_of_material(
         details = json.loads(bom_details)
     except Exception:
         return "Error: bom_details must be a valid JSON array."
-    payload = {
-        "bomTypeID": bom_type_id,
-        "bomName": bom_name,
-        "bomCostTotal": bom_cost_total,
-        "accessType": access_type,
-        "selectedUserAccess": [],
-        "bomDetails": details,
-    }
-    if bom_code:
-        payload["bomCode"] = bom_code
-    if notes:
-        payload["notes"] = notes
+    payload = {"bomTypeID": bom_type_id, "bomName": bom_name, "bomCostTotal": bom_cost_total, "accessType": access_type, "selectedUserAccess": [], "bomDetails": details}
+    if bom_code: payload["bomCode"] = bom_code
+    if notes: payload["notes"] = notes
     if bom_costs:
-        try:
-            payload["bomCosts"] = json.loads(bom_costs)
-        except Exception:
-            return "Error: bom_costs must be a valid JSON array."
+        try: payload["bomCosts"] = json.loads(bom_costs)
+        except Exception: return "Error: bom_costs must be a valid JSON array."
     url = f"{ESB_BASE_URL}/product/bom"
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
     try:
@@ -298,26 +242,8 @@ def create_bill_of_material(
         return f"Network error: {str(e)}"
 
 @mcp.tool()
-def update_bill_of_material(
-    bom_id: str,
-    bom_type: str,
-    bom_name: str,
-    bom_cost_total: float,
-    access_type: int,
-    bom_details: str,
-    bom_code: str = "",
-    product_detail_id: int = 0,
-    notes: str = "",
-    bom_costs: str = ""
-) -> str:
-    """
-    Update an existing Bill of Material in ESB Core by its ID.
-    bom_type: 'menu' (3), 'assembly' (1), or 'disassembly' (2).
-    bom_details: JSON array of objects with keys: ID, productDetailID, lastHPP, qty, yieldPercent, tolerancePercent, printGroup (opt), weightFactor (opt, required for disassembly).
-    bom_costs: optional JSON array with keys: ID, costDescription, coaNo, costTotal.
-    product_detail_id: required for assembly/disassembly, optional for menu.
-    access_type: 0=all users, 1=specific users only.
-    """
+def update_bill_of_material(bom_id: str, bom_type: str, bom_name: str, bom_cost_total: float, access_type: int, bom_details: str, bom_code: str = "", product_detail_id: int = 0, notes: str = "", bom_costs: str = "") -> str:
+    """Update an existing Bill of Material by its ID."""
     token = get_esb_token()
     if not token:
         return "Authentication Failure: Could not get login token from ESB Core."
@@ -329,25 +255,13 @@ def update_bill_of_material(
         details = json.loads(bom_details)
     except Exception:
         return "Error: bom_details must be a valid JSON array."
-    payload = {
-        "bomTypeID": bom_type_id,
-        "bomName": bom_name,
-        "bomCostTotal": bom_cost_total,
-        "accessType": access_type,
-        "selectedUserAccess": [],
-        "bomDetails": details,
-    }
-    if bom_code:
-        payload["bomCode"] = bom_code
-    if notes:
-        payload["notes"] = notes
-    if product_detail_id:
-        payload["productDetailID"] = product_detail_id
+    payload = {"bomTypeID": bom_type_id, "bomName": bom_name, "bomCostTotal": bom_cost_total, "accessType": access_type, "selectedUserAccess": [], "bomDetails": details}
+    if bom_code: payload["bomCode"] = bom_code
+    if notes: payload["notes"] = notes
+    if product_detail_id: payload["productDetailID"] = product_detail_id
     if bom_costs:
-        try:
-            payload["bomCosts"] = json.loads(bom_costs)
-        except Exception:
-            return "Error: bom_costs must be a valid JSON array."
+        try: payload["bomCosts"] = json.loads(bom_costs)
+        except Exception: return "Error: bom_costs must be a valid JSON array."
     url = f"{ESB_BASE_URL}/product/bom/{bom_id}"
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
     try:
@@ -359,20 +273,8 @@ def update_bill_of_material(
         return f"Network error: {str(e)}"
 
 @mcp.tool()
-def create_assembly_actual(
-    simple_manufacturing_date: str,
-    branch_id: int,
-    origin_location_id: int,
-    destination_location_id: int,
-    manufacturing_details: str,
-    manufacturing_materials: str
-) -> str:
-    """
-    Create a Simple Manufacturing Assembly Actual Costing in ESB Core.
-    simple_manufacturing_date: YYYY-MM-DD format.
-    manufacturing_details: JSON array of objects with keys: bomID, productDetailID, productionOrderQty, productionOrderResultQty, notes (opt), expiredDate (opt, YYYY-MM-DD).
-    manufacturing_materials: JSON array of objects with keys: productDetailID, systemQty, totalQty.
-    """
+def create_assembly_actual(simple_manufacturing_date: str, branch_id: int, origin_location_id: int, destination_location_id: int, manufacturing_details: str, manufacturing_materials: str) -> str:
+    """Create a Simple Manufacturing Assembly Actual Costing in ESB Core."""
     token = get_esb_token()
     if not token:
         return "Authentication Failure: Could not get login token from ESB Core."
@@ -381,14 +283,7 @@ def create_assembly_actual(
         materials = json.loads(manufacturing_materials)
     except Exception:
         return "Error: manufacturing_details and manufacturing_materials must be valid JSON arrays."
-    payload = {
-        "simpleManufacturingDate": simple_manufacturing_date,
-        "branchID": branch_id,
-        "originLocationID": origin_location_id,
-        "destinationLocationID": destination_location_id,
-        "simpleManufacturingDetails": details,
-        "simpleManufacturingMaterials": materials,
-    }
+    payload = {"simpleManufacturingDate": simple_manufacturing_date, "branchID": branch_id, "originLocationID": origin_location_id, "destinationLocationID": destination_location_id, "simpleManufacturingDetails": details, "simpleManufacturingMaterials": materials}
     url = f"{ESB_BASE_URL}/production/simple-manufacturing/assembly-actual"
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
     try:
@@ -400,20 +295,8 @@ def create_assembly_actual(
         return f"Network error: {str(e)}"
 
 @mcp.tool()
-def create_disassembly_actual(
-    simple_manufacturing_date: str,
-    branch_id: int,
-    origin_location_id: int,
-    destination_location_id: int,
-    manufacturing_details: str,
-    manufacturing_materials: str
-) -> str:
-    """
-    Create a Simple Manufacturing Disassembly Actual Costing in ESB Core.
-    simple_manufacturing_date: YYYY-MM-DD format.
-    manufacturing_details: JSON array of objects with keys: bomID, productDetailID, productionOrderQty, productionOrderResultQty, notes (opt), expiredDate (opt, YYYY-MM-DD).
-    manufacturing_materials: JSON array of objects with keys: productDetailID, systemQty, totalQty.
-    """
+def create_disassembly_actual(simple_manufacturing_date: str, branch_id: int, origin_location_id: int, destination_location_id: int, manufacturing_details: str, manufacturing_materials: str) -> str:
+    """Create a Simple Manufacturing Disassembly Actual Costing in ESB Core."""
     token = get_esb_token()
     if not token:
         return "Authentication Failure: Could not get login token from ESB Core."
@@ -422,14 +305,7 @@ def create_disassembly_actual(
         materials = json.loads(manufacturing_materials)
     except Exception:
         return "Error: manufacturing_details and manufacturing_materials must be valid JSON arrays."
-    payload = {
-        "simpleManufacturingDate": simple_manufacturing_date,
-        "branchID": branch_id,
-        "originLocationID": origin_location_id,
-        "destinationLocationID": destination_location_id,
-        "simpleManufacturingDetails": details,
-        "simpleManufacturingMaterials": materials,
-    }
+    payload = {"simpleManufacturingDate": simple_manufacturing_date, "branchID": branch_id, "originLocationID": origin_location_id, "destinationLocationID": destination_location_id, "simpleManufacturingDetails": details, "simpleManufacturingMaterials": materials}
     url = f"{ESB_BASE_URL}/production/simple-manufacturing/disassembly-actual"
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
     try:
@@ -441,20 +317,8 @@ def create_disassembly_actual(
         return f"Network error: {str(e)}"
 
 @mcp.tool()
-def create_memorial_journal(
-    memorial_journal_num: str,
-    memorial_journal_date: str,
-    debit_lines: str,
-    credit_lines: str,
-    additional_info: str = ""
-) -> str:
-    """
-    Create a Memorial Journal entry in ESB Core (uses ext API: core-api.esb.co.id).
-    memorial_journal_date: YYYY-MM-DD format.
-    debit_lines: JSON array of objects with keys: branchCode, coaNo, currency, rate, amount, notes (opt).
-    credit_lines: JSON array of objects with keys: branchCode, coaNo, currency, rate, amount, notes (opt).
-    Debit and credit totals must balance.
-    """
+def create_memorial_journal(memorial_journal_num: str, memorial_journal_date: str, debit_lines: str, credit_lines: str, additional_info: str = "") -> str:
+    """Create a Memorial Journal entry in ESB Core (uses ext API: core-api.esb.co.id). Debit and credit totals must balance."""
     token = get_esb_token()
     if not token:
         return "Authentication Failure: Could not get login token from ESB Core."
@@ -463,14 +327,8 @@ def create_memorial_journal(
         credit = json.loads(credit_lines)
     except Exception:
         return "Error: debit_lines and credit_lines must be valid JSON arrays."
-    payload = {
-        "memorialJournalNum": memorial_journal_num,
-        "memorialJournalDate": memorial_journal_date,
-        "debit": debit,
-        "credit": credit,
-    }
-    if additional_info:
-        payload["additionalInfo"] = additional_info
+    payload = {"memorialJournalNum": memorial_journal_num, "memorialJournalDate": memorial_journal_date, "debit": debit, "credit": credit}
+    if additional_info: payload["additionalInfo"] = additional_info
     url = f"{ESB_BASE_URL_EXT}/extv1/memorial-journal"
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
     try:
@@ -483,12 +341,7 @@ def create_memorial_journal(
 
 @mcp.tool()
 def update_bom_name(bom_id: str, new_bom_name: str) -> str:
-    """
-    Update a Bill of Material's name by bomID.
-    Returns success/failure status. Use this to rename BOMs according to:
-    [Department] - [BOM Type] - [Noun]
-    Example: "KITCHEN - FOOD - Aglio E Olio"
-    """
+    """Update a Bill of Material name by bomID. Format: [Department] - [BOM Type] - [Noun]"""
     token = get_esb_token()
     if not token:
         return "Authentication Failure: Could not get login token from ESB Core."
@@ -502,25 +355,12 @@ def update_bom_name(bom_id: str, new_bom_name: str) -> str:
         if not bom_data:
             return f"ERROR: BOM {bom_id} not found"
         def safe_int(val, default=0):
-            if val is None or val == '': return default
-            try: return int(val)
+            try: return int(val) if val not in (None, '') else default
             except: return default
         def safe_float(val, default=0.0):
-            if val is None or val == '': return default
-            try: return float(val)
+            try: return float(val) if val not in (None, '') else default
             except: return default
-        update_payload = {
-            "bomName": new_bom_name,
-            "bomCode": bom_data.get('bomCode') or '',
-            "bomTypeID": safe_int(bom_data.get('bomTypeID'), 3),
-            "productDetailID": bom_data.get('productDetailID') or None,
-            "notes": bom_data.get('notes') or '',
-            "bomCostTotal": safe_float(bom_data.get('bomCostTotal'), 0),
-            "accessType": safe_int(bom_data.get('accessType'), 0),
-            "bomDetails": bom_data.get('bomDetails') or [],
-            "bomCosts": bom_data.get('bomCosts') or [],
-            "selectedUserAccess": bom_data.get('selectedUserAccess') or []
-        }
+        update_payload = {"bomName": new_bom_name, "bomCode": bom_data.get('bomCode') or '', "bomTypeID": safe_int(bom_data.get('bomTypeID'), 3), "productDetailID": bom_data.get('productDetailID') or None, "notes": bom_data.get('notes') or '', "bomCostTotal": safe_float(bom_data.get('bomCostTotal'), 0), "accessType": safe_int(bom_data.get('accessType'), 0), "bomDetails": bom_data.get('bomDetails') or [], "bomCosts": bom_data.get('bomCosts') or [], "selectedUserAccess": bom_data.get('selectedUserAccess') or []}
         put_response = requests.put(get_url, json=update_payload, headers=headers, timeout=15)
         if put_response.status_code == 200:
             return f"SUCCESS: BOM {bom_id} renamed to '{new_bom_name}'"
@@ -530,23 +370,15 @@ def update_bom_name(bom_id: str, new_bom_name: str) -> str:
 
 @mcp.tool()
 def list_products(product_name: str = "", category_id: str = "", flag_active: str = "1", limit: str = "100") -> str:
-    """
-    List Products from ESB Core Master Product catalogue. Optionally filter by product_name
-    (partial match), category_id (integer), and flag_active (1=Active, 0=Not Active).
-    Returns productID, productName, productCode, categoryName, subCategoryName, bomID,
-    bomName, and flagActive for each product.
-    """
+    """List Products from ESB Core Master Product catalogue."""
     token = get_esb_token()
     if not token:
         return "Authentication Failure: Could not get login token from ESB Core."
     url = f"{ESB_BASE_URL}/product/list"
     params = {"limit": int(limit) if limit else 100}
-    if product_name:
-        params["productName"] = product_name
-    if category_id:
-        params["categoryID"] = int(category_id)
-    if flag_active != "":
-        params["flagActive"] = int(flag_active)
+    if product_name: params["productName"] = product_name
+    if category_id: params["categoryID"] = int(category_id)
+    if flag_active != "": params["flagActive"] = int(flag_active)
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
     try:
         response = requests.get(url, headers=headers, params=params, timeout=15)
@@ -557,44 +389,17 @@ def list_products(product_name: str = "", category_id: str = "", flag_active: st
         return f"Network error: {str(e)}"
 
 @mcp.tool()
-def get_pos_sales_information(
-    sales_date_from: str,
-    sales_date_to: str,
-    branch_code: str = "",
-    self_order_id: str = "",
-    page: int = 1
-) -> str:
-    """
-    Get per-item POS sales information synced from ESB local POS systems (ESB OMS).
-    sales_date_from and sales_date_to are required, format YYYY-MM-DD.
-    branch_code filters by branch (if empty, all branches returned).
-    """
+def get_pos_sales_information(sales_date_from: str, sales_date_to: str, branch_code: str = "", self_order_id: str = "", page: int = 1) -> str:
+    """Get per-item POS sales information from ESB OMS. sales_date_from and sales_date_to in YYYY-MM-DD format."""
     import base64
     credentials = base64.b64encode(f"{ESB_USERNAME}:{ESB_PASSWORD}".encode()).decode()
-    headers = {
-        "Authorization": f"Basic {credentials}",
-        "Content-Type": "application/json"
-    }
-    body = {
-        "filterSalesDateFrom": sales_date_from,
-        "filterSalesDateTo": sales_date_to,
-        "filterBranchCode": branch_code,
-        "filterSelfOrderID": self_order_id
-    }
+    headers = {"Authorization": f"Basic {credentials}", "Content-Type": "application/json"}
+    body = {"filterSalesDateFrom": sales_date_from, "filterSalesDateTo": sales_date_to, "filterBranchCode": branch_code, "filterSelfOrderID": self_order_id}
     url = f"https://int-erp.esb.co.id/external/sales/get-sales-information?page={page}"
     try:
         response = requests.post(url, headers=headers, json=body, timeout=30)
         if response.status_code == 200:
-            total_pages = response.headers.get("X-Pagination-Page-Count", "?")
-            current_page = response.headers.get("X-Pagination-Current-Page", page)
-            total_count = response.headers.get("X-Pagination-Total-Count", "?")
-            data = response.json()
-            return json.dumps({
-                "page": current_page,
-                "totalPages": total_pages,
-                "totalCount": total_count,
-                "sales": data
-            })
+            return json.dumps({"page": response.headers.get("X-Pagination-Current-Page", page), "totalPages": response.headers.get("X-Pagination-Page-Count", "?"), "totalCount": response.headers.get("X-Pagination-Total-Count", "?"), "sales": response.json()})
         return f"OMS Error {response.status_code}: {response.text}"
     except Exception as e:
         return f"Network error: {str(e)}"
@@ -614,30 +419,22 @@ class MCPWrapper:
         path = scope.get("path", "")
         method = scope.get("method", "GET")
 
-        # OAuth discovery
         if path == "/.well-known/oauth-protected-resource" or \
            path.startswith("/.well-known/oauth-protected-resource/"):
-            body = json.dumps({
-                "resource": "https://statement-coffee-mcp.onrender.com",
-                "authorization_servers": []
-            }).encode()
-            await send({"type": "http.response.start", "status": 200,
-                        "headers": [(b"content-type", b"application/json"),
-                                    (b"content-length", str(len(body)).encode())]})
+            body = json.dumps({"resource": "https://statement-coffee-mcp.onrender.com", "authorization_servers": []}).encode()
+            await send({"type": "http.response.start", "status": 200, "headers": [(b"content-type", b"application/json"), (b"content-length", str(len(body)).encode())]})
             await send({"type": "http.response.body", "body": body})
             return
 
-        # Proxy: GET /api/stock
         if path == "/api/stock":
             if method == "OPTIONS":
-                await send({"type": "http.response.start", "status": 200,
-                            "headers": CORS_HEADERS + [(b"content-length", b"0")]})
+                await send({"type": "http.response.start", "status": 200, "headers": CORS_HEADERS + [(b"content-length", b"0")]})
                 await send({"type": "http.response.body", "body": b""})
                 return
             qs = urllib.parse.parse_qs(scope.get("query_string", b"").decode())
             product_id = qs.get("productID", [None])[0]
-            branch_id  = qs.get("branchID",  ["2"])[0]
-            date_str   = qs.get("date",       [""])[0]
+            branch_id = qs.get("branchID", ["2"])[0]
+            date_str = qs.get("date", [""])[0]
             if not date_str:
                 from datetime import date
                 date_str = date.today().isoformat()
@@ -649,21 +446,15 @@ class MCPWrapper:
                 await json_response(send, {"error": "ESB auth failed"}, 500)
                 return
             try:
-                url = f"{ESB_BASE_URL}/stock/stock-movement"
-                params = {"productID": product_id, "branchID": branch_id,
-                          "documentDateFrom": date_str, "documentDateTo": date_str, "limit": 1}
-                r = requests.get(url, headers={"Authorization": f"Bearer {token}"},
-                                 params=params, timeout=15)
+                r = requests.get(f"{ESB_BASE_URL}/stock/stock-movement", headers={"Authorization": f"Bearer {token}"}, params={"productID": product_id, "branchID": branch_id, "documentDateFrom": date_str, "documentDateTo": date_str, "limit": 1}, timeout=15)
                 await json_response(send, r.json(), r.status_code)
             except Exception as e:
                 await json_response(send, {"error": str(e)}, 500)
             return
 
-        # Proxy: POST /api/purchase-request
         if path == "/api/purchase-request":
             if method == "OPTIONS":
-                await send({"type": "http.response.start", "status": 200,
-                            "headers": CORS_HEADERS + [(b"content-length", b"0")]})
+                await send({"type": "http.response.start", "status": 200, "headers": CORS_HEADERS + [(b"content-length", b"0")]})
                 await send({"type": "http.response.body", "body": b""})
                 return
             body_bytes = await read_body(receive)
@@ -677,17 +468,12 @@ class MCPWrapper:
                 await json_response(send, {"error": "ESB auth failed"}, 500)
                 return
             try:
-                url = f"{ESB_BASE_URL}/purchase/purchase-request"
-                r = requests.post(url,
-                                  headers={"Authorization": f"Bearer {token}",
-                                           "Content-Type": "application/json"},
-                                  json=body_data, timeout=30)
+                r = requests.post(f"{ESB_BASE_URL}/purchase/purchase-request", headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"}, json=body_data, timeout=30)
                 await json_response(send, r.json(), r.status_code)
             except Exception as e:
                 await json_response(send, {"error": str(e)}, 500)
             return
 
-        # Fix host header for MCP security check
         port = int(os.getenv("PORT", 8000))
         patched_headers = []
         for key, value in scope.get("headers", []):
