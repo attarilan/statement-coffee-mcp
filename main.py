@@ -464,16 +464,24 @@ class MCPWrapper:
                 await json_response(send, {"error": "ESB auth failed"}, 500)
                 return
             try:
-                r = requests.get(
-                    f"{ESB_BASE_URL}/report/stock-movement",
-                    headers={"Authorization": f"Bearer {token}"},
-                    params={"startPeriod": date_str, "endPeriod": date_str,
-                            "branchID": branch_id, "limit": 100},
-                    timeout=15
-                )
-                data = r.json()
-                items = (data.get("result") or {}).get("data") or []
+                def fetch_stock(start, end):
+                    return requests.get(
+                        f"{ESB_BASE_URL}/report/stock-movement",
+                        headers={"Authorization": f"Bearer {token}"},
+                        params={"startPeriod": start, "endPeriod": end,
+                                "branchID": branch_id, "limit": 100},
+                        timeout=15
+                    )
+                r = fetch_stock(date_str, date_str)
+                items = (r.json().get("result") or {}).get("data") or []
                 match = next((x for x in items if str(x.get("productID")) == str(product_id)), None)
+                if not match:
+                    from datetime import date, timedelta
+                    week_ago = (date.fromisoformat(date_str) - timedelta(days=7)).isoformat()
+                    r2 = fetch_stock(week_ago, date_str)
+                    items2 = (r2.json().get("result") or {}).get("data") or []
+                    candidates = [x for x in items2 if str(x.get("productID")) == str(product_id)]
+                    match = candidates[-1] if candidates else None
                 payload = {"result": [match]} if match else {"result": [], "message": "not found"}
                 await json_response(send, payload, 200)
             except Exception as e:
