@@ -132,13 +132,11 @@ def get_bill_of_material_detail(bom_id: str) -> str:
 # Build the MCP app
 mcp_asgi = mcp.streamable_http_app()
 
-# Wrapper: fixes host header + handles OAuth discovery + proxy API endpoints
 class MCPWrapper:
     def __init__(self, app):
         self.app = app
 
     async def __call__(self, scope, receive, send):
-        # Pass lifespan through directly so MCP initializes its task group
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
@@ -146,7 +144,6 @@ class MCPWrapper:
         path = scope.get("path", "")
         method = scope.get("method", "GET")
 
-        # OAuth discovery: tell Claude no sign-in is required
         if path == "/.well-known/oauth-protected-resource" or \
            path.startswith("/.well-known/oauth-protected-resource/"):
             body = json.dumps({
@@ -159,7 +156,6 @@ class MCPWrapper:
             await send({"type": "http.response.body", "body": body})
             return
 
-        # ── Proxy: GET /api/stock ──────────────────────────────────────────
         if path == "/api/stock":
             if method == "OPTIONS":
                 await send({"type": "http.response.start", "status": 200,
@@ -182,13 +178,8 @@ class MCPWrapper:
                 return
             try:
                 url = f"{ESB_BASE_URL}/stock/stock-movement"
-                params = {
-                    "productID": product_id,
-                    "branchID":  branch_id,
-                    "documentDateFrom": date_str,
-                    "documentDateTo":   date_str,
-                    "limit": 1,
-                }
+                params = {"productID": product_id, "branchID": branch_id,
+                          "documentDateFrom": date_str, "documentDateTo": date_str, "limit": 1}
                 r = requests.get(url, headers={"Authorization": f"Bearer {token}"},
                                  params=params, timeout=15)
                 await json_response(send, r.json(), r.status_code)
@@ -196,7 +187,6 @@ class MCPWrapper:
                 await json_response(send, {"error": str(e)}, 500)
             return
 
-        # ── Proxy: POST /api/purchase-request ─────────────────────────────
         if path == "/api/purchase-request":
             if method == "OPTIONS":
                 await send({"type": "http.response.start", "status": 200,
@@ -224,8 +214,6 @@ class MCPWrapper:
                 await json_response(send, {"error": str(e)}, 500)
             return
 
-        # Fix host header: rewrite Render's public domain to localhost
-        # so the MCP library's security check passes
         port = int(os.getenv("PORT", 8000))
         patched_headers = []
         for key, value in scope.get("headers", []):
@@ -235,7 +223,6 @@ class MCPWrapper:
                 patched_headers.append((key, value))
         scope = dict(scope)
         scope["headers"] = patched_headers
-
         await self.app(scope, receive, send)
 
 
