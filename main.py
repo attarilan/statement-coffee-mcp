@@ -465,13 +465,17 @@ class MCPWrapper:
                 return
             try:
                 r = requests.get(
-                    f"{ESB_BASE_URL}/stock/stock-movement",
+                    f"{ESB_BASE_URL}/report/stock-movement",
                     headers={"Authorization": f"Bearer {token}"},
-                    params={"productID": product_id, "branchID": branch_id,
-                            "documentDateFrom": date_str, "documentDateTo": date_str, "limit": 1},
+                    params={"startPeriod": date_str, "endPeriod": date_str,
+                            "branchID": branch_id, "limit": 100},
                     timeout=15
                 )
-                await json_response(send, r.json(), r.status_code)
+                data = r.json()
+                items = (data.get("result") or {}).get("data") or []
+                match = next((x for x in items if str(x.get("productID")) == str(product_id)), None)
+                payload = {"result": [match]} if match else {"result": [], "message": "not found"}
+                await json_response(send, payload, 200)
             except Exception as e:
                 await json_response(send, {"error": str(e)}, 500)
             return
