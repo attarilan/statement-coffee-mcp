@@ -143,12 +143,10 @@ input.notes-input{width:100px;border:1px solid #e0ddd6;border-radius:5px;padding
 
 <script>
 /* ══════════════════════════════════════════════
-   CONFIGURATION — edit this section before distributing
+   CONFIGURATION
    ══════════════════════════════════════════════ */
-const ESB_BASE    = 'https://services.esb.co.id/core';
-const ESB_USER    = 'STMTSUPERADMIN';   // ← ganti
-const ESB_PASS    = 'PrestakaKopi2025!*';   // ← ganti
-const BRANCH_ID   = 2;                       // 2 = Statement Coffee
+const RENDER_BASE = 'https://statement-coffee-mcp.onrender.com';
+const BRANCH_ID   = 2;  // 2 = Statement Coffee
 
 /* PR Catalog — tambah/kurangi item di sini
    productDetailID : ID dari ESB product detail (untuk create PR)
@@ -166,26 +164,8 @@ const PR_CATALOG = [
 ];
 /* ══════════════════════════════════════════════ */
 
-let esbToken     = null;
-let tokenExpiry  = 0;
 let suggestions  = [];
 let activeDept   = '';
-
-/* ── Auth ─────────────────────────────────── */
-async function getToken(){
-  if(esbToken && Date.now() < tokenExpiry) return esbToken;
-  const r = await fetch(ESB_BASE+'/auth/login',{
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({username:ESB_USER, password:ESB_PASS})
-  });
-  if(!r.ok) throw new Error('Login ESB gagal ('+r.status+'). Hubungi admin.');
-  const d = await r.json();
-  const tok = d?.result?.token || d?.token;
-  if(!tok) throw new Error('Token tidak ditemukan dalam response ESB.');
-  esbToken   = tok;
-  tokenExpiry = Date.now() + 50*60*1000; // 50 min
-  return tok;
-}
 
 /* ── Dept chips ───────────────────────────── */
 function buildDeptChips(){
@@ -217,7 +197,6 @@ async function calcSuggestions(){
   setStatus('Menghubungi ESB...','loading');
   suggestions = [];
   try{
-    const token = await getToken();
     const today = new Date().toISOString().slice(0,10);
     for(let i=0;i<catalog.length;i++){
       const item = catalog[i];
@@ -226,8 +205,8 @@ async function calcSuggestions(){
       if(!item.stockProductID){ err='Product ID belum diisi'; }
       else{
         try{
-          const url=ESB_BASE+'/stock/stock-movement?productID='+item.stockProductID+'&branchID='+BRANCH_ID+'&documentDateFrom='+today+'&documentDateTo='+today+'&limit=1';
-          const r=await fetch(url,{headers:{Authorization:'Bearer '+token}});
+          const url=RENDER_BASE+'/api/stock?productID='+item.stockProductID+'&branchID='+BRANCH_ID+'&date='+today;
+          const r=await fetch(url);
           if(r.ok){
             const data=await r.json(); const res=data?.result;
             if(Array.isArray(res)&&res.length){ stockQty=parseFloat(res[0].qtyBalance)||0; uom=res[0].uom||''; }
@@ -323,7 +302,6 @@ async function submitPR(){
   const btn=document.getElementById('btnSubmit');
   btn.disabled=true; btn.textContent='Mengirim...';
   try{
-    const token=await getToken();
     const today=new Date().toISOString().slice(0,10);
     const details=included.map(s=>({
       productDetailID:s.item.productDetailID,
@@ -331,9 +309,9 @@ async function submitPR(){
       qty:s.userQty,
       notes:s.notes||''
     }));
-    const r=await fetch(ESB_BASE+'/purchase/purchase-request',{
+    const r=await fetch(RENDER_BASE+'/api/purchase-request',{
       method:'POST',
-      headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},
+      headers:{'Content-Type':'application/json'},
       body:JSON.stringify({branchID:BRANCH_ID,purchaseRequestDate:today,requiredDate:rd,purchaseRequestDetails:details,isTemplate:false})
     });
     const data=await r.json();
