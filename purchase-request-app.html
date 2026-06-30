@@ -191,7 +191,7 @@ async function getToken(){
 function buildDeptChips(){
   const depts = [...new Set(PR_CATALOG.map(i=>i.dept||'').filter(Boolean))];
   const row = document.getElementById('deptRow');
-  row.innerHTML = '<button class="dept-chip active" onclick="setDept('')" data-dept="">Semua</button>';
+  row.innerHTML = `<button class="dept-chip active" onclick="setDept('')" data-dept="">Semua</button>`;
   depts.forEach(d=>{
     const b = document.createElement('button');
     b.className = 'dept-chip';
